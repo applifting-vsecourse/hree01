@@ -26,6 +26,12 @@ Need a control that isn't in `src/components/ui/`? Add it with `pnpm dlx shadcn@
 
 The CLI puts `shadow-xs`/`shadow-sm` on inputs, textareas and cards. [`DESIGN.md`](DESIGN.md) keeps shadows for things that genuinely float — dialogs, dropdowns, toasts. Strip them.
 
+### Everything in the repo is in English
+
+The team may talk to you in another language (often Czech). Answer in that language, but everything you write into the repo is English: UI copy, code, comments, test data, commit messages, and docs such as user stories. Translate requirements as you implement them; don't carry the conversation's language into files.
+
+Test data that needs accented characters (e.g. diacritics-insensitive matching) uses English words that have them — "café", "naïve" — not words from the conversation's language. Proper names stay as they are.
+
 ### The app is already running
 
 Assume the dev servers are up. If something is listening on the app's ports, that is this application: use it. Don't start a second instance, don't restart it, don't run `pnpm dev`.

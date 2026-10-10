@@ -24,6 +24,23 @@ describe("QuackList", () => {
     expect(screen.getByText("@CaffeinatedDuck")).toBeInTheDocument()
   })
 
+  it("explains an empty search and offers to clear it", async () => {
+    const onClearSearch = vi.fn()
+    render(
+      <QuackList
+        quacks={[]}
+        search="pond"
+        onClearSearch={onClearSearch}
+      />,
+    )
+
+    expect(screen.getByText("No quacks match “pond”.")).toBeInTheDocument()
+    expect(screen.queryByText(/No quacks yet/)).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole("button", { name: "Clear search" }))
+    expect(onClearSearch).toHaveBeenCalledOnce()
+  })
+
   it("shows an error with a working reload button", async () => {
     const onReload = vi.fn()
     render(
