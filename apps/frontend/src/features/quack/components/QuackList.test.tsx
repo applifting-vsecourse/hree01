@@ -25,7 +25,7 @@ describe("QuackList", () => {
     expect(screen.getByText("@CaffeinatedDuck")).toBeInTheDocument()
   })
 
-it("explains an empty search and offers to clear it", async () => {
+  it("explains an empty search and offers to clear it", async () => {
     const onClearSearch = vi.fn()
     render(
       <QuackList
