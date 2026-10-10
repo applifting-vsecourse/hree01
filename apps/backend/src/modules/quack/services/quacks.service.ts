@@ -1,4 +1,4 @@
-import { Quack } from '@/modules/quack/domain/quack';
+import { Quack, QuackMood } from '@/modules/quack/domain/quack';
 import {
   matchesSearchTerms,
   parseSearchTerms,
@@ -39,10 +39,11 @@ export class QuacksService {
 
   async createQuack(
     user: Identity,
-    quackData: { text: string },
+    quackData: { text: string; mood: QuackMood | null },
   ): Promise<Quack> {
     return this.quackRepository.createQuack({
       text: quackData.text,
+      mood: quackData.mood,
       // the author is taken from the session, never from the request body
       userId: user.id,
     });
