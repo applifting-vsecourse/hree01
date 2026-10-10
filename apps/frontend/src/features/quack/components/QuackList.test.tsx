@@ -25,7 +25,7 @@ describe("QuackList", () => {
     expect(screen.getByText("@CaffeinatedDuck")).toBeInTheDocument()
   })
 
-it("explains an empty search and offers to clear it", async () => {
+  it("explains an empty search and offers to clear it", async () => {
     const onClearSearch = vi.fn()
     render(
       <QuackList
@@ -35,7 +35,7 @@ it("explains an empty search and offers to clear it", async () => {
       />,
     )
 
-    expect(screen.getByText("No quacks match “pond”")).toBeInTheDocument()
+    expect(screen.getByText("No quacks match “pond”.")).toBeInTheDocument()
     expect(screen.queryByText(/No quacks yet/)).not.toBeInTheDocument()
 
     await userEvent.click(screen.getByRole("button", { name: "Clear search" }))
