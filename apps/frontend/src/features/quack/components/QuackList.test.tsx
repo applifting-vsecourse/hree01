@@ -35,7 +35,7 @@ describe("QuackList", () => {
       />,
     )
 
-    expect(screen.getByText("No quacks match “pond”")).toBeInTheDocument()
+    expect(screen.getByText("No quacks match “pond”.")).toBeInTheDocument()
     expect(screen.queryByText(/No quacks yet/)).not.toBeInTheDocument()
 
     await userEvent.click(screen.getByRole("button", { name: "Clear search" }))
