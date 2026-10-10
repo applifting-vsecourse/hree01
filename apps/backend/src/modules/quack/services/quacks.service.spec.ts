@@ -3,6 +3,7 @@
 import { Quack } from '@/modules/quack/domain/quack';
 import { QuackRepository } from '@/modules/quack/repositories/quack.repository';
 import { Identity } from '@/shared/auth/domain/identity';
+import { Logger } from '@nestjs/common';
 import { mock } from 'jest-mock-extended';
 import { QuacksService } from './quacks.service';
 
@@ -18,15 +19,45 @@ const aQuack = (overrides: Partial<Quack> = {}): Quack => ({
 });
 
 describe('QuacksService', () => {
-  it('returns quacks from the repository', async () => {
+  const user = { id: 'u1' } as Identity;
+
+  it('returns all quacks from the repository for a blank search', async () => {
     const quacks = [aQuack()];
     const repository = mock<QuackRepository>();
     repository.getQuacks.mockResolvedValue(quacks);
 
     const service = new QuacksService(repository);
+    const log = jest.spyOn(Logger.prototype, 'log').mockImplementation();
 
-    await expect(service.getQuacks()).resolves.toEqual(quacks);
+    await expect(service.searchQuacks(user, '   ')).resolves.toEqual(quacks);
     expect(repository.getQuacks).toHaveBeenCalledTimes(1);
+    // a blank search is not a search, so it is not counted
+    expect(log).not.toHaveBeenCalled();
+    log.mockRestore();
+  });
+
+  it('returns only matching quacks and logs the search without its text', async () => {
+    const match = aQuack({ id: 'q1', text: 'Ducks by the café' });
+    const other = aQuack({ id: 'q2', text: 'Geese in the meadow' });
+    const repository = mock<QuackRepository>();
+    repository.getQuacks.mockResolvedValue([match, other]);
+
+    const service = new QuacksService(repository);
+    const log = jest.spyOn(Logger.prototype, 'log').mockImplementation();
+
+    await expect(service.searchQuacks(user, 'cafe')).resolves.toEqual([match]);
+    expect(log).toHaveBeenCalledTimes(1);
+    const entry = JSON.parse(log.mock.calls[0][0] as string) as Record<
+      string,
+      unknown
+    >;
+    expect(entry).toMatchObject({
+      event: 'quacks.search',
+      userId: 'u1',
+      resultCount: 1,
+    });
+    expect(JSON.stringify(entry)).not.toContain('cafe');
+    log.mockRestore();
   });
 
   it('creates a quack owned by the signed-in user', async () => {
