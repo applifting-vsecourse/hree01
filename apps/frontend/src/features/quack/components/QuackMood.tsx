@@ -1,11 +1,4 @@
-import type { QuackMood as Mood } from "@/features/quack/api/quackSchemas"
-
-export const moodLabels: Record<Mood, { emoji: string; label: string }> = {
-  happy: { emoji: "😄", label: "Happy" },
-  sad: { emoji: "😢", label: "Sad" },
-  angry: { emoji: "😠", label: "Angry" },
-  silly: { emoji: "🤪", label: "Silly" },
-}
+import { moodLabels, type Mood } from "@/lib/moods"
 
 type QuackMoodProps = { mood: Mood }
 
