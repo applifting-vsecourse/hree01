@@ -1,38 +1,49 @@
-# Search the feed
+# Polls in quacks
 
-As someone who remembers a word from a quack or who wrote it, I want to type something into a search field and see only the matching quacks, so that I can quickly find a quack I saw earlier.
+As someone asking the group a question (like where to go for lunch), I want to attach answer options to my quack and let people vote, so that everyone sees correct counts without anyone tallying replies by hand.
 
 ## Acceptance criteria
 
-### Searching
+### Creating a poll
 
-- A search field with a visible label sits above the feed.
-- The feed filters as the user types (debounced by about 300 ms). Searching starts from 1 character.
-- The search covers the quack's text, the author's name and the author's @username.
-- A query with several words matches only quacks that contain every one of them, anywhere in the text or the author. For example, "duck pond" finds a quack by Caffeinated Duck that mentions a pond.
-- Matching ignores letter case and diacritics and also works on part of a word: "caf" and "CAFE" both find "Café".
-- Results keep the feed's order: newest first.
-- An empty field, or one containing only spaces, shows the whole feed.
-- A query is at most 100 characters. Both the client and the server enforce the limit, and the client shows the error under the field.
+- The new-quack form has an "Add poll" button. It adds two empty option fields. "Add option" adds more, up to 10, and each option can be removed down to 2. The whole poll can be removed.
+- The quack's text is the question, with the same rules as today: required, at most 280 characters.
+- Each option is trimmed, required and at most 80 characters, and no two options may be the same (ignoring case). Both client and server validate this, and the error appears under the specific option.
+- A "Show results" choice offers **Right away** (default) or **After voting**.
+- A poll can have a mood like any quack. Polls and options can't be edited after posting.
 
-### State and navigation
+### Voting
 
-- The query is in the URL (`/quacks?q=…`). It survives a reload and can be shared as a link. The Back button works.
-- The field has a clear button with an `aria-label`.
-- When nothing matches, the feed shows a sentence saying no quack matches, and a button to clear the search.
-- Loading and error states (with a way to retry) work the same as in the feed.
-- If the user posts a quack while a search is active, the search stays active. The new quack appears only if it matches the query.
+- Any signed-in user can vote, including the author. One person has one vote per poll, and the database enforces this.
+- Clicking an option votes for it. Clicking another option moves the vote, and clicking your own option again removes it.
+- Voting feels instant: the selection and counts update immediately on click. If rapid clicks overlap, the last click wins. Once the server responds, its numbers are shown.
+- If a vote fails, the poll goes back to its previous state. Under the poll it says "Your vote didn't go through" with a "Try again" button.
+- Options are buttons with `aria-pressed`. Your own vote is marked with an icon and the text "Your vote".
+
+### Results
+
+- Each option shows its vote count and percentage, and the poll shows the total number of votes.
+- With **After voting**, people who haven't voted see only the options and "Results appear after you vote". Removing your vote hides the results again.
+- The server counts the votes. Counts refresh after your own vote and when the tab regains focus. There are no live updates.
+- Nobody, not even the author, can see who voted for what.
+
+### Closing
+
+- Only the author sees "Close poll". Closing is confirmed in a dialog and is permanent.
+- A closed poll is marked "Closed". No one can vote or change a vote, and everyone sees the results, whichever results setting the poll had.
+
+### Search
+
+- Search finds a poll by its question (the quack text), not by its options.
 
 ### Measurement
 
-- The server does the filtering (`GET /api/quacks?q=…`), not the browser.
-- The backend writes every non-empty search to a structured log: user ID, time and number of results. The query text itself is not stored.
-- From the log you can get **the number of unique users who searched in a week**, relative to active users, and **the share of searches with 0 results**. A developer prepares the report when the PO asks for it. No dashboard.
+- Polls and votes are stored with the time each vote was created and last changed. A developer prepares a weekly report on request, straight from the database: polls created, distinct poll authors, distinct voters, and average votes per poll. No new logging, no dashboard.
 
 ## Out of scope
 
-Highlighting matches, searching by mood, date filters, suggestions and paginating results.
+Multiple choices per person, deadlines, reopening a poll, voter names, live updates, editing a poll, images in options.
 
 ## Open for the PO
 
-What share of users would convince the PO that search is worth developing further. It doesn't affect the implementation, but it is worth deciding before the numbers are in.
+What weekly numbers would convince the PO that polls are worth developing further. It doesn't affect the implementation.
