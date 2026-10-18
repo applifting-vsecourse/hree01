@@ -39,9 +39,58 @@ model Quack {
   userId    String
   createdAt DateTime   @default(now())
   updatedAt DateTime   @default(now()) @updatedAt
+  poll      Poll?
 
   @@index([userId])
   @@map("quack")
+}
+
+enum PollResultsVisibility {
+  right_away
+  after_voting
+
+  @@map("poll_results_visibility")
+}
+
+model Poll {
+  quack             Quack                 @relation(fields: [quackId], references: [id], onDelete: Cascade)
+  quackId           String                @id // 1 quack : 0..1 poll, so the quack's id is the poll's id
+  resultsVisibility PollResultsVisibility @default(right_away)
+  closedAt          DateTime? // null = open; closing is permanent
+  createdAt         DateTime              @default(now())
+  options           PollOption[]
+  votes             PollVote[]
+
+  @@map("poll")
+}
+
+model PollOption {
+  id       String     @id @default(cuid())
+  poll     Poll       @relation(fields: [quackId], references: [quackId], onDelete: Cascade)
+  quackId  String
+  text     String     @db.VarChar(80)
+  position Int // display order
+  votes    PollVote[]
+
+  @@unique([quackId, position])
+  @@unique([id, quackId]) // target for the vote's composite FK
+  @@map("poll_option")
+}
+
+model PollVote {
+  id        String     @id @default(cuid())
+  poll      Poll       @relation(fields: [quackId], references: [quackId], onDelete: Cascade)
+  quackId   String
+  option    PollOption @relation(fields: [optionId, quackId], references: [id, quackId], onDelete: Cascade)
+  optionId  String
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@unique([quackId, userId]) // one person, one vote, enforced by the DB
+  @@index([optionId])
+  @@map("poll_vote")
 }
 
 model Session {
@@ -93,25 +142,26 @@ model Verification {
 }
 
 model User {
-  id              String    @id
-  name            String
-  email           String
-  emailVerified   Boolean
-  image           String?   @db.Text
-  createdAt       DateTime
-  updatedAt       DateTime
-  sessions        Session[]
-  accounts        Account[]
-  quacks          Quack[]
-  role            UserRole  @default(user)
+  id            String     @id
+  name          String
+  email         String
+  emailVerified Boolean
+  image         String?    @db.Text
+  createdAt     DateTime
+  updatedAt     DateTime
+  sessions      Session[]
+  accounts      Account[]
+  quacks        Quack[]
+  pollVotes     PollVote[]
+  role          UserRole   @default(user)
 
   // BetterAuth's username plugin stores `username` lowercased (so uniqueness is
   // case-insensitive) and keeps the form the user typed in `displayUsername`.
   username        String? @db.VarChar(50)
   displayUsername String? @db.VarChar(50)
 
-  bio             String?    @db.VarChar(160)
-  defaultMood     QuackMood?
+  bio         String?    @db.VarChar(160)
+  defaultMood QuackMood?
 
   @@unique([email])
   @@unique([username])

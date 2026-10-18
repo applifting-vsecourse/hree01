@@ -26,6 +26,8 @@ Need a control that isn't in `src/components/ui/`? Add it with `pnpm dlx shadcn@
 
 The CLI puts `shadow-xs`/`shadow-sm` on inputs, textareas and cards. [`DESIGN.md`](DESIGN.md) keeps shadows for things that genuinely float — dialogs, dropdowns, toasts. Strip them.
 
+In this repo the CLI also imports `cn` from an npm package called `cn` and adds that package to `package.json` and `pnpm-lock.yaml`. Point the import back at `@/lib/utils`, and revert both files (`radix-ui` is already installed, so the component needs no new dependency).
+
 ### Forms follow the settings form
 
 [`ProfileForm`](apps/frontend/src/features/profile/components/ProfileForm.tsx) is the reference. On top of the form rules in [`DESIGN.md`](DESIGN.md):

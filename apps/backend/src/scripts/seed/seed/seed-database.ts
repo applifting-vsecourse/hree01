@@ -2,6 +2,7 @@ import { PrismaService } from '@/core/prisma/prisma.service';
 import { User } from '@/generated/prisma/client';
 import { BetterAuth } from '@/shared/auth/providers/better-auth.provider';
 import { Config } from '@/shared/config/config.service';
+import { createPoll } from './create-poll';
 import { createQuack } from './create-quack';
 import { createUser } from './create-user';
 
@@ -171,4 +172,58 @@ Please stop tagging me.`,
       createdAt: new Date(now - minutesAgo * MINUTE_IN_MS),
     });
   }
+
+  console.log('Creating example polls');
+
+  // One of each state the feed has to handle: open with visible results,
+  // results hidden until you vote, and closed.
+  const lunchQuack = await createQuack(prisma, {
+    text: 'Where do we go for lunch today?',
+    userId: breadCritic.id,
+    createdAt: new Date(now - 95 * MINUTE_IN_MS),
+  });
+  await createPoll(prisma, {
+    quackId: lunchQuack.id,
+    options: [
+      'The café by the pond',
+      'Bakery on the corner',
+      'Leftover crusts',
+    ],
+    votes: [
+      { userId: breadCritic.id, option: 1 },
+      { userId: caffeinatedDuck.id, option: 0 },
+      { userId: migrationSeason.id, option: 1 },
+    ],
+  });
+
+  const migrationQuack = await createQuack(prisma, {
+    text: 'Honest answer only: which way is south?',
+    userId: migrationSeason.id,
+    createdAt: new Date(now - 60 * MINUTE_IN_MS),
+  });
+  await createPoll(prisma, {
+    quackId: migrationQuack.id,
+    options: ['That way', 'The other way', 'Follow whoever is in front'],
+    resultsVisibility: 'after_voting',
+    votes: [
+      { userId: pondAdmin.id, option: 2 },
+      { userId: deepDuckThoughts.id, option: 2 },
+    ],
+  });
+
+  const reedsQuack = await createQuack(prisma, {
+    text: 'Should the north end reopen before the reeds are done?',
+    userId: pondAdmin.id,
+    createdAt: new Date(now - 30 * MINUTE_IN_MS),
+  });
+  await createPoll(prisma, {
+    quackId: reedsQuack.id,
+    options: ['Yes', 'No', 'Ask the heron'],
+    closedAt: new Date(now - 5 * MINUTE_IN_MS),
+    votes: [
+      { userId: caffeinatedDuck.id, option: 2 },
+      { userId: breadCritic.id, option: 2 },
+      { userId: deepDuckThoughts.id, option: 0 },
+    ],
+  });
 };

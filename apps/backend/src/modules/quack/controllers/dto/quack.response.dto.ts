@@ -1,9 +1,10 @@
 import {
-  Quack,
+  FeedQuack,
   QUACK_MOODS,
   type QuackMood,
 } from '@/modules/quack/domain/quack';
 import { ApiProperty } from '@nestjs/swagger';
+import { PollResponseDto } from './poll.response.dto';
 
 class QuackUserDto {
   @ApiProperty()
@@ -35,7 +36,10 @@ export class QuackResponseDto {
   @ApiProperty({ type: QuackUserDto })
   user!: QuackUserDto;
 
-  static fromDomain(quack: Quack): QuackResponseDto {
+  @ApiProperty({ type: PollResponseDto, nullable: true })
+  poll!: PollResponseDto | null;
+
+  static fromDomain(quack: FeedQuack): QuackResponseDto {
     if (!quack.user) {
       throw new Error(
         `QuackResponseDto.fromDomain expected quack.user to be loaded for quack ${quack.id}`,
@@ -52,6 +56,7 @@ export class QuackResponseDto {
         name: quack.user.name,
         username: quack.user.username,
       },
+      poll: quack.poll ? PollResponseDto.fromDomain(quack.poll) : null,
     };
   }
 }
