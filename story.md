@@ -16,13 +16,13 @@ As someone asking the group a question (like where to go for lunch), I want to a
 
 - Any signed-in user can vote, including the author. One person has one vote per poll, and the database enforces this.
 - Clicking an option votes for it. Clicking another option moves the vote, and clicking your own option again removes it.
-- Voting feels instant: the selection and counts update immediately on click. If rapid clicks overlap, the last click wins. Once the server responds, its numbers are shown.
+- Voting feels instant: the selection updates immediately on click, and so do the counts when they are visible. On an "After voting" poll the results appear once the server responds, since the counts aren't known before then. If rapid clicks overlap, the last click wins. Once the server responds, its numbers are shown.
 - If a vote fails, the poll goes back to its previous state. Under the poll it says "Your vote didn't go through" with a "Try again" button.
 - Options are buttons with `aria-pressed`. Your own vote is marked with an icon and the text "Your vote".
 
 ### Results
 
-- Each option shows its vote count and percentage, and the poll shows the total number of votes.
+- Each option shows its vote count and percentage, and the poll shows the total number of votes. Percentages are whole numbers, so they may add up to 99 or 101 %.
 - With **After voting**, people who haven't voted see only the options and "Results appear after you vote". Removing your vote hides the results again.
 - The server counts the votes. Counts refresh after your own vote and when the tab regains focus. There are no live updates.
 - Nobody, not even the author, can see who voted for what.
@@ -39,6 +39,7 @@ As someone asking the group a question (like where to go for lunch), I want to a
 ### Measurement
 
 - Polls and votes are stored with the time each vote was created and last changed. A developer prepares a weekly report on request, straight from the database: polls created, distinct poll authors, distinct voters, and average votes per poll. No new logging, no dashboard.
+- A removed vote is deleted, so someone who voted and then removed their vote doesn't appear in the report.
 
 ## Out of scope
 
