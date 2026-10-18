@@ -1,22 +1,9 @@
-import { useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
 
 import { quackKeys } from "@/features/quack/api/quackKeys"
-import type { Poll, Quack } from "@/features/quack/api/quackSchemas"
 import { setVote } from "@/features/quack/api/setVote"
 import { applyVote } from "@/features/quack/lib/applyVote"
-
-/** Rewrites one quack's poll in every cached feed list, search results included. */
-const updatePollInLists = (
-  queryClient: QueryClient,
-  quackId: string,
-  update: (poll: Poll) => Poll,
-): void => {
-  queryClient.setQueriesData<Quack[]>({ queryKey: quackKeys.lists() }, (quacks) =>
-    quacks?.map((quack) =>
-      quack.id === quackId && quack.poll ? { ...quack, poll: update(quack.poll) } : quack,
-    ),
-  )
-}
+import { updatePollInLists } from "@/features/quack/lib/updatePollInLists"
 
 /**
  * Voting that feels instant. Clicks on one poll are sent in order (`scope`),

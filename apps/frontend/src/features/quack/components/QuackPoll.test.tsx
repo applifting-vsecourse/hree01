@@ -1,14 +1,16 @@
 import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query"
-import { act, render, screen } from "@testing-library/react"
+import { act, render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
+import { closePoll } from "@/features/quack/api/closePoll"
 import { quackKeys } from "@/features/quack/api/quackKeys"
 import type { Poll, Quack } from "@/features/quack/api/quackSchemas"
 import { setVote } from "@/features/quack/api/setVote"
 import { QuackPoll } from "@/features/quack/components/QuackPoll"
 
 vi.mock("@/features/quack/api/setVote", () => ({ setVote: vi.fn() }))
+vi.mock("@/features/quack/api/closePoll", () => ({ closePoll: vi.fn() }))
 
 const options = (cafe: number | null, bakery: number | null): Poll["options"] => [
   { id: "o1", text: "The café by the pond", votes: cafe },
@@ -208,5 +210,66 @@ describe("QuackPoll voting", () => {
       }),
     )
     expect(await screen.findByText("3 votes")).toBeInTheDocument()
+  })
+})
+
+describe("QuackPoll closing", () => {
+  beforeEach(() => {
+    vi.mocked(closePoll).mockReset()
+  })
+
+  const closeButton = () => screen.queryByRole("button", { name: "Close poll" })
+
+  it("offers closing only to the author of an open poll", () => {
+    renderFromFeed(aPoll({ isAuthor: false }))
+    expect(closeButton()).not.toBeInTheDocument()
+  })
+
+  it("does not offer closing a poll that is already closed", () => {
+    renderFromFeed(aPoll({ isAuthor: true, isClosed: true }))
+    expect(closeButton()).not.toBeInTheDocument()
+  })
+
+  it("asks first, and keeping it open changes nothing", async () => {
+    renderFromFeed(aPoll({ isAuthor: true }))
+
+    await userEvent.click(screen.getByRole("button", { name: "Close poll" }))
+    expect(screen.getByRole("dialog", { name: "Close this poll?" })).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole("button", { name: "Keep it open" }))
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
+    expect(closePoll).not.toHaveBeenCalled()
+  })
+
+  it("closes the poll once confirmed", async () => {
+    const closed = aPoll({ isAuthor: true, isClosed: true })
+    const server = renderFromFeed(aPoll({ isAuthor: true }))
+    vi.mocked(closePoll).mockImplementation(() => {
+      server.poll = closed
+      return Promise.resolve(closed)
+    })
+
+    await userEvent.click(screen.getByRole("button", { name: "Close poll" }))
+    const dialog = screen.getByRole("dialog")
+    await userEvent.click(within(dialog).getByRole("button", { name: "Close poll" }))
+
+    expect(closePoll).toHaveBeenCalledWith("q1")
+    expect(await screen.findByText("2 votes · Closed")).toBeInTheDocument()
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
+    expect(option(/café/i)).toBeDisabled()
+  })
+
+  it("keeps the dialog open with the reason when closing fails", async () => {
+    vi.mocked(closePoll).mockRejectedValue(new Error("Only the author can close this poll"))
+    renderFromFeed(aPoll({ isAuthor: true }))
+
+    await userEvent.click(screen.getByRole("button", { name: "Close poll" }))
+    const dialog = screen.getByRole("dialog")
+    await userEvent.click(within(dialog).getByRole("button", { name: "Close poll" }))
+
+    expect(
+      await within(dialog).findByText("Only the author can close this poll"),
+    ).toBeInTheDocument()
+    expect(screen.getByRole("dialog")).toBeInTheDocument()
   })
 })

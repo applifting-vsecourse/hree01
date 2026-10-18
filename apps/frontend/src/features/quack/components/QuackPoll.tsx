@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button"
 
 import type { Poll as PollData } from "@/features/quack/api/quackSchemas"
+import { ClosePollDialog } from "@/features/quack/components/ClosePollDialog"
 import { Poll } from "@/features/quack/components/Poll"
 import { useVote } from "@/features/quack/hooks/useVote"
 
@@ -31,6 +32,11 @@ export function QuackPoll({ quackId, poll }: QuackPollProps) {
           >
             Try again
           </Button>
+        </div>
+      ) : null}
+      {poll.isAuthor && !poll.isClosed ? (
+        <div>
+          <ClosePollDialog quackId={quackId} />
         </div>
       ) : null}
     </div>
