@@ -26,6 +26,7 @@ export const authSessionQueryOptions = () =>
 
       const user = data.user as typeof data.user & {
         username?: string | null
+        displayUsername?: string | null
         role?: string | null
       }
 
@@ -34,7 +35,10 @@ export const authSessionQueryOptions = () =>
           id: user.id,
           email: user.email,
           name: user.name,
-          username: user.username ?? "",
+          // `username` is stored lowercased; show the form the user typed
+          // `||`, not `??`: an empty string also means "fall back"
+          // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+          username: user.displayUsername || user.username || "",
           role: user.role ?? undefined,
         },
       }

@@ -19,7 +19,8 @@ const mapPrismaQuackToDomain = (
     ? {
         id: quack.user.id,
         name: quack.user.name,
-        username: quack.user.username ?? '',
+        // the form the author typed; `username` itself is stored lowercased
+        username: quack.user.displayUsername ?? quack.user.username ?? '',
       }
     : undefined,
 });

@@ -5,6 +5,7 @@ import { z } from "zod"
 
 import { Seo } from "@/components/Seo"
 
+import { profileQueryOptions } from "@/features/profile/api/profileQueryOptions"
 import { quacksQueryOptions } from "@/features/quack/api/quacksQueryOptions"
 import { QuackForm } from "@/features/quack/components/QuackForm"
 import { QuackList } from "@/features/quack/components/QuackList"
@@ -27,6 +28,8 @@ function QuacksPage() {
   const { q: search = "" } = Route.useSearch()
   const navigate = Route.useNavigate()
   const quacksQuery = useQuery(quacksQueryOptions(search))
+  // Only used to preselect the default mood; the form works without it.
+  const profileQuery = useQuery(profileQueryOptions())
 
   // The search lives in the URL so it survives a reload and can be shared.
   // `replace` keeps typing from filling the history with one entry per word.
@@ -41,7 +44,10 @@ function QuacksPage() {
       <section className="mx-auto w-full max-w-2xl px-4 py-8">
         <h1 className="mb-4 text-2xl font-semibold tracking-tight">Quacks</h1>
 
-        <QuackForm className="mb-6" />
+        <QuackForm
+          defaultMood={profileQuery.data?.defaultMood}
+          className="mb-6"
+        />
 
         <QuackSearch
           value={search}
