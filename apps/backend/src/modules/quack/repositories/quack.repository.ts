@@ -5,7 +5,7 @@ import {
   Quack as PrismaQuack,
   User as PrismaUser,
 } from '@/generated/prisma/client';
-import { Poll, PollStats } from '@/modules/quack/domain/poll';
+import { NewPoll, Poll, PollStats } from '@/modules/quack/domain/poll';
 import { Quack, QuackMood } from '@/modules/quack/domain/quack';
 import { Injectable } from '@nestjs/common';
 
@@ -189,12 +189,29 @@ export class QuackRepository {
     text: string;
     mood: QuackMood | null;
     userId: string;
+    poll: NewPoll | null;
   }): Promise<Quack> {
+    const { poll } = createQuackData;
+    // One nested create: the quack, its poll and the options are written
+    // together or not at all.
     const quack = await this.prisma.quack.create({
       data: {
         text: createQuackData.text,
         mood: createQuackData.mood,
         user: { connect: { id: createQuackData.userId } },
+        poll: poll
+          ? {
+              create: {
+                resultsVisibility: poll.resultsVisibility,
+                options: {
+                  create: poll.options.map((text, position) => ({
+                    text,
+                    position,
+                  })),
+                },
+              },
+            }
+          : undefined,
       },
       include: quackInclude,
     });

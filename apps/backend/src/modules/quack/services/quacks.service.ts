@@ -1,5 +1,6 @@
 import {
   EMPTY_POLL_STATS,
+  NewPoll,
   PollView,
   toPollView,
 } from '@/modules/quack/domain/poll';
@@ -51,11 +52,12 @@ export class QuacksService {
 
   async createQuack(
     user: Identity,
-    quackData: { text: string; mood: QuackMood | null },
+    quackData: { text: string; mood: QuackMood | null; poll: NewPoll | null },
   ): Promise<FeedQuack> {
     const quack = await this.quackRepository.createQuack({
       text: quackData.text,
       mood: quackData.mood,
+      poll: quackData.poll,
       // the author is taken from the session, never from the request body
       userId: user.id,
     });

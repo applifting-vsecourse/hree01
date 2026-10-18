@@ -124,12 +124,13 @@ describe('QuacksService', () => {
     const user = { id: 'u1' } as Identity;
 
     await expect(
-      service.createQuack(user, { text: 'hello', mood: null }),
+      service.createQuack(user, { text: 'hello', mood: null, poll: null }),
     ).resolves.toEqual(created);
     // the author comes from the session, not from the caller's payload
     expect(repository.createQuack).toHaveBeenCalledWith({
       text: 'hello',
       mood: null,
+      poll: null,
       userId: 'u1',
     });
   });
@@ -143,12 +144,54 @@ describe('QuacksService', () => {
     const user = { id: 'u1' } as Identity;
 
     await expect(
-      service.createQuack(user, { text: 'lol', mood: 'silly' }),
+      service.createQuack(user, { text: 'lol', mood: 'silly', poll: null }),
     ).resolves.toEqual(created);
     expect(repository.createQuack).toHaveBeenCalledWith({
       text: 'lol',
       mood: 'silly',
+      poll: null,
       userId: 'u1',
+    });
+  });
+
+  it('creates a poll with the quack and returns it with no votes yet', async () => {
+    const poll = {
+      options: ['Café', 'Bakery'],
+      resultsVisibility: 'after_voting' as const,
+    };
+    const repository = mock<QuackRepository>();
+    repository.createQuack.mockResolvedValue(
+      aQuack({
+        id: 'q4',
+        text: 'Lunch?',
+        poll: {
+          quackId: 'q4',
+          resultsVisibility: 'after_voting',
+          closedAt: null,
+          options: [
+            { id: 'o1', text: 'Café' },
+            { id: 'o2', text: 'Bakery' },
+          ],
+        },
+      }),
+    );
+    repository.getPollStats.mockResolvedValue(new Map());
+
+    const service = new QuacksService(repository);
+    const created = await service.createQuack(user, {
+      text: 'Lunch?',
+      mood: null,
+      poll,
+    });
+
+    expect(repository.createQuack).toHaveBeenCalledWith(
+      expect.objectContaining({ poll }),
+    );
+    expect(created.poll).toMatchObject({
+      isAuthor: true,
+      myOptionId: null,
+      resultsVisible: false,
+      totalVotes: null,
     });
   });
 

@@ -23,6 +23,12 @@ export type Poll = {
   options: PollOption[];
 };
 
+/** What it takes to create a poll; options in display order. */
+export type NewPoll = {
+  options: string[];
+  resultsVisibility: PollResultsVisibility;
+};
+
 /** Vote counts for one poll, plus the viewer's own vote. */
 export type PollStats = {
   votesByOption: ReadonlyMap<string, number>;
