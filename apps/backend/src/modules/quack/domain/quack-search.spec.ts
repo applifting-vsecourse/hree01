@@ -5,6 +5,7 @@ const aQuack = (overrides: Partial<Quack> = {}): Quack => ({
   id: 'q1',
   text: 'Feeding naïve ducks by the café pond',
   mood: null,
+  poll: null,
   userId: 'u1',
   createdAt: new Date('2026-01-01T12:00:00Z'),
   updatedAt: new Date('2026-01-01T12:00:00Z'),

@@ -1,5 +1,6 @@
 // Example unit test — the pattern to copy for your own services.
 // The repository is mocked, so the test exercises the service in isolation.
+import { Poll } from '@/modules/quack/domain/poll';
 import { Quack } from '@/modules/quack/domain/quack';
 import { QuackRepository } from '@/modules/quack/repositories/quack.repository';
 import { Identity } from '@/shared/auth/domain/identity';
@@ -11,6 +12,7 @@ const aQuack = (overrides: Partial<Quack> = {}): Quack => ({
   id: 'q1',
   text: 'quack quack',
   mood: null,
+  poll: null,
   userId: 'u1',
   createdAt: new Date('2026-01-01T12:00:00Z'),
   updatedAt: new Date('2026-01-01T12:00:00Z'),
@@ -20,6 +22,8 @@ const aQuack = (overrides: Partial<Quack> = {}): Quack => ({
 
 describe('QuacksService', () => {
   const user = { id: 'u1' } as Identity;
+
+  afterEach(() => jest.restoreAllMocks());
 
   it('returns all quacks from the repository for a blank search', async () => {
     const quacks = [aQuack()];
@@ -34,6 +38,51 @@ describe('QuacksService', () => {
     // a blank search is not a search, so it is not counted
     expect(log).not.toHaveBeenCalled();
     log.mockRestore();
+  });
+
+  it('attaches each poll as this viewer sees it, fetching stats only for returned polls', async () => {
+    const poll: Poll = {
+      quackId: 'q1',
+      resultsVisibility: 'right_away',
+      closedAt: null,
+      options: [
+        { id: 'o1', text: 'Café' },
+        { id: 'o2', text: 'Bakery' },
+      ],
+    };
+    const withPoll = aQuack({ id: 'q1', text: 'Lunch at the café?', poll });
+    const otherPoll = aQuack({
+      id: 'q2',
+      text: 'Geese or swans?',
+      userId: 'u2',
+      poll: { ...poll, quackId: 'q2' },
+    });
+    const repository = mock<QuackRepository>();
+    repository.getQuacks.mockResolvedValue([withPoll, otherPoll]);
+    repository.getPollStats.mockResolvedValue(
+      new Map([
+        ['q1', { votesByOption: new Map([['o2', 2]]), myOptionId: 'o2' }],
+      ]),
+    );
+
+    const service = new QuacksService(repository);
+    jest.spyOn(Logger.prototype, 'log').mockImplementation();
+
+    const [result] = await service.searchQuacks(user, 'cafe');
+
+    expect(repository.getPollStats).toHaveBeenCalledWith(['q1'], 'u1');
+    expect(result.poll).toEqual({
+      resultsVisibility: 'right_away',
+      isClosed: false,
+      isAuthor: true,
+      myOptionId: 'o2',
+      resultsVisible: true,
+      totalVotes: 2,
+      options: [
+        { id: 'o1', text: 'Café', votes: 0 },
+        { id: 'o2', text: 'Bakery', votes: 2 },
+      ],
+    });
   });
 
   it('returns only matching quacks and logs the search without its text', async () => {
