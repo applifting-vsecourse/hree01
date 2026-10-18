@@ -79,6 +79,50 @@ pnpm backend start:dev
 
 REST API (Swagger/OpenAPI) is available at http://localhost:4050/api/docs when the server is running.
 
+## Poll usage report
+
+The product owner wants to know whether people use polls. There is no dashboard and no extra logging; run this against the database (e.g. in Prisma Studio's SQL console or `psql`) when asked:
+
+```sql
+-- Weekly poll usage, newest week first.
+WITH poll_weeks AS (
+  SELECT date_trunc('week', p."createdAt") AS week,
+         COUNT(*) AS polls_created,
+         COUNT(DISTINCT q."userId") AS poll_authors,
+         ROUND(AVG(v.votes), 1) AS avg_votes_per_poll
+  FROM "poll" p
+  JOIN "quack" q ON q."id" = p."quackId"
+  CROSS JOIN LATERAL (
+    SELECT COUNT(*) AS votes FROM "poll_vote" pv WHERE pv."quackId" = p."quackId"
+  ) v
+  GROUP BY 1
+),
+voter_weeks AS (
+  -- a vote counts in the week it was cast and in the week it was last changed
+  SELECT week, COUNT(DISTINCT "userId") AS distinct_voters
+  FROM (
+    SELECT date_trunc('week', "createdAt") AS week, "userId" FROM "poll_vote"
+    UNION
+    SELECT date_trunc('week', "updatedAt") AS week, "userId" FROM "poll_vote"
+  ) activity
+  GROUP BY week
+)
+SELECT COALESCE(p.week, v.week)::date AS week_starting,
+       COALESCE(p.polls_created, 0) AS polls_created,
+       COALESCE(p.poll_authors, 0) AS poll_authors,
+       COALESCE(v.distinct_voters, 0) AS distinct_voters,
+       p.avg_votes_per_poll
+FROM poll_weeks p
+FULL JOIN voter_weeks v ON v.week = p.week
+ORDER BY week_starting DESC;
+```
+
+Read it with these limits in mind:
+
+- A removed vote is deleted, so someone who voted and then removed their vote doesn't appear.
+- `avg_votes_per_poll` is the current vote count of the polls created that week, so it keeps growing as people vote on older polls.
+- A vote changed several times only remembers its first and last change.
+
 # Installation
 
 First, make sure that you provided all the necessary env variables in .env file using .env.example as a template.
