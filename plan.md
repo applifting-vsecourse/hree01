@@ -93,7 +93,7 @@ Key decisions:
 - **The server decides whether results are visible.** While results are hidden, the counts are not sent at all (`null`); otherwise they could be read in DevTools. The rule: results are visible if the poll is `right_away`, the viewer has voted, or the poll is closed. It is a pure function with unit tests.
 - **Voting and closing can't race each other.** Both run in a transaction that first locks the poll's row (`SELECT … FOR UPDATE`), then checks `closedAt`, then writes. Without the lock, a vote that checked "open" just before the author closed the poll would still be written, and the results of a closed poll would change.
 - **Voting and closing are safe to repeat.** Repeating `PUT` or `DELETE` gives the same result, so "Try again" and late responses can't break anything. Closing an already closed poll returns it unchanged. Every response returns the current poll state, so the client doesn't have to reload the whole feed after a vote.
-- **Database errors map to API errors.** A first vote from two tabs at once can hit the unique index (`P2002`): retry the write once. An option from another poll is rejected by the composite foreign key (`P2003`); the service checks it first so the 400 has a readable message.
+- **Database errors map to API errors.** The row lock applies votes on one poll one at a time, so a first vote from two tabs at once can't hit the unique index; no retry is needed. An option from another poll would be rejected by the composite foreign key (`P2003`); the repository checks it first inside the transaction so the 400 has a readable message.
 - **The feed loads in three queries regardless of how many polls it contains:** quacks with polls and options, a `groupBy` of counts per option, and the viewer's own votes.
 - **Percentages are whole numbers,** each rounded on its own, so they can add up to 99 or 101 %.
 - **Search is unchanged.** The question is the quack's text, which search already covers.
@@ -113,7 +113,7 @@ Key decisions:
 
 1. **Schema, migration (including the expression index), domain types, and a seed with sample polls** (open, results after voting, closed). From here on, every later step has data to build on.
 2. **Reading polls:** repository with three queries, the results-visibility function, and `GET /api/quacks` extended with `poll`. Unit tests for visibility.
-3. **Voting and closing:** `PUT`/`DELETE` vote and `close` endpoints with the row lock, with service tests (closed poll, option from another poll, closing by someone other than the author, `P2002` retry).
+3. **Voting and closing:** `PUT`/`DELETE` vote and `close` endpoints with the row lock, with service tests (closed poll, option from another poll, closing by someone other than the author).
 4. **Creating a poll:** nested DTO (2–10 options, trimmed, max 80 characters, case-insensitive uniqueness) and the transaction. At this point **the backend is done** and can be exercised end to end in Swagger.
 5. **Frontend: read-only `Poll` display,** on the seeded data. Tests for all three states (results visible, hidden, closed) and percentage rounding.
 6. **Frontend: voting,** following the rules above. Tests include a failed vote, two quick clicks where the first one fails, and an "After voting" poll revealing results on response.

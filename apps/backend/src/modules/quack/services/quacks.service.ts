@@ -1,4 +1,8 @@
-import { EMPTY_POLL_STATS, toPollView } from '@/modules/quack/domain/poll';
+import {
+  EMPTY_POLL_STATS,
+  PollView,
+  toPollView,
+} from '@/modules/quack/domain/poll';
 import { FeedQuack, Quack, QuackMood } from '@/modules/quack/domain/quack';
 import {
   matchesSearchTerms,
@@ -6,7 +10,14 @@ import {
 } from '@/modules/quack/domain/quack-search';
 import { QuackRepository } from '@/modules/quack/repositories/quack.repository';
 import { Identity } from '@/shared/auth/domain/identity';
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 
 @Injectable()
 export class QuacksService {
@@ -50,6 +61,53 @@ export class QuacksService {
     });
     const [created] = await this.withPollViews([quack], user);
     return created;
+  }
+
+  /** Votes for an option, or with `optionId: null` removes the vote. */
+  async setVote(
+    user: Identity,
+    quackId: string,
+    optionId: string | null,
+  ): Promise<PollView> {
+    const result = await this.quackRepository.setVote(
+      quackId,
+      user.id,
+      optionId,
+    );
+    switch (result) {
+      case 'not_found':
+        throw new NotFoundException('Poll not found');
+      case 'closed':
+        throw new ConflictException('This poll is closed');
+      case 'invalid_option':
+        throw new BadRequestException('That option is not part of this poll');
+      case 'ok':
+        return this.getPollView(user, quackId);
+    }
+  }
+
+  async closePoll(user: Identity, quackId: string): Promise<PollView> {
+    const result = await this.quackRepository.closePoll(quackId, user.id);
+    switch (result) {
+      case 'not_found':
+        throw new NotFoundException('Poll not found');
+      case 'forbidden':
+        throw new ForbiddenException('Only the author can close this poll');
+      case 'ok':
+        return this.getPollView(user, quackId);
+    }
+  }
+
+  private async getPollView(
+    viewer: Identity,
+    quackId: string,
+  ): Promise<PollView> {
+    const found = await this.quackRepository.getPoll(quackId);
+    if (!found) throw new NotFoundException('Poll not found');
+    const stats = await this.quackRepository.getPollStats([quackId], viewer.id);
+    return toPollView(found.poll, stats.get(quackId) ?? EMPTY_POLL_STATS, {
+      isAuthor: found.authorId === viewer.id,
+    });
   }
 
   private async withPollViews(

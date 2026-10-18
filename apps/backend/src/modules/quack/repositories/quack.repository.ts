@@ -9,6 +9,9 @@ import { Poll, PollStats } from '@/modules/quack/domain/poll';
 import { Quack, QuackMood } from '@/modules/quack/domain/quack';
 import { Injectable } from '@nestjs/common';
 
+export type SetVoteResult = 'ok' | 'not_found' | 'closed' | 'invalid_option';
+export type ClosePollResult = 'ok' | 'not_found' | 'forbidden';
+
 // Loaded with every quack, so the feed gets its polls in the same query.
 const quackInclude = {
   user: true,
@@ -106,6 +109,80 @@ export class QuackRepository {
       if (pollStats) pollStats.myOptionId = optionId;
     }
     return stats;
+  }
+
+  async getPoll(
+    quackId: string,
+  ): Promise<{ poll: Poll; authorId: string } | null> {
+    const poll = await this.prisma.poll.findUnique({
+      where: { quackId },
+      include: {
+        options: { orderBy: { position: 'asc' } },
+        quack: { select: { userId: true } },
+      },
+    });
+    return poll
+      ? { poll: mapPrismaPollToDomain(poll), authorId: poll.quack.userId }
+      : null;
+  }
+
+  /**
+   * Sets (or with `optionId: null` removes) the user's vote. The poll's row is
+   * locked first, so a vote can't slip in after the poll is closed, and votes
+   * on one poll are applied one at a time — two tabs can't race on a first vote.
+   */
+  async setVote(
+    quackId: string,
+    userId: string,
+    optionId: string | null,
+  ): Promise<SetVoteResult> {
+    return this.prisma.$transaction(async (tx) => {
+      const [poll] = await tx.$queryRaw<{ closedAt: Date | null }[]>`
+        SELECT "closedAt" FROM "poll" WHERE "quackId" = ${quackId} FOR UPDATE`;
+      if (!poll) return 'not_found';
+      if (poll.closedAt) return 'closed';
+
+      if (optionId === null) {
+        await tx.pollVote.deleteMany({ where: { quackId, userId } });
+        return 'ok';
+      }
+
+      const option = await tx.pollOption.findFirst({
+        where: { id: optionId, quackId },
+        select: { id: true },
+      });
+      if (!option) return 'invalid_option';
+
+      await tx.pollVote.upsert({
+        where: { quackId_userId: { quackId, userId } },
+        create: { quackId, userId, optionId },
+        update: { optionId },
+      });
+      return 'ok';
+    });
+  }
+
+  /** Closes the poll for good. Closing a closed poll changes nothing. */
+  async closePoll(quackId: string, userId: string): Promise<ClosePollResult> {
+    return this.prisma.$transaction(async (tx) => {
+      // Same lock as voting, so a vote and the close can't interleave.
+      const [poll] = await tx.$queryRaw<
+        { closedAt: Date | null; authorId: string }[]
+      >`
+        SELECT p."closedAt", q."userId" AS "authorId"
+        FROM "poll" p JOIN "quack" q ON q."id" = p."quackId"
+        WHERE p."quackId" = ${quackId}
+        FOR UPDATE OF p`;
+      if (!poll) return 'not_found';
+      if (poll.authorId !== userId) return 'forbidden';
+      if (!poll.closedAt) {
+        await tx.poll.update({
+          where: { quackId },
+          data: { closedAt: new Date() },
+        });
+      }
+      return 'ok';
+    });
   }
 
   async createQuack(createQuackData: {
