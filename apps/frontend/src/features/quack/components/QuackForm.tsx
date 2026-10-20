@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react"
+import { useEffect, useImperativeHandle, useRef, type Ref } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { ListChecks, Loader2 } from "lucide-react"
 import { useFieldArray, useForm, useWatch } from "react-hook-form"
@@ -27,13 +27,17 @@ import {
 } from "@/features/quack/components/quackFormSchema"
 import { useAddQuack } from "@/features/quack/hooks/useAddQuack"
 
+export type QuackFormHandle = { focus: () => void }
+
 type QuackFormProps = {
   /** Preselected for every new quack — the user's default mood from settings. */
   defaultMood?: Mood | null
   className?: string
+  /** Lets the page send the user here, e.g. from an empty feed. */
+  ref?: Ref<QuackFormHandle>
 }
 
-export function QuackForm({ defaultMood = null, className }: QuackFormProps) {
+export function QuackForm({ defaultMood = null, className, ref }: QuackFormProps) {
   const addQuack = useAddQuack()
   const defaultMoodOption = toMoodOption(defaultMood)
   const form = useForm<QuackFormValues>({
@@ -48,6 +52,8 @@ export function QuackForm({ defaultMood = null, className }: QuackFormProps) {
   const pollOptions = useFieldArray({ control: form.control, name: "pollOptions" })
   const hasPoll = pollOptions.fields.length > 0
   const addPollRef = useRef<HTMLButtonElement>(null)
+
+  useImperativeHandle(ref, () => ({ focus: () => form.setFocus("text") }), [form])
 
   // The default mood can arrive after the form mounts (it is loaded with the
   // profile). Adopt it unless the user has already picked a mood themselves.

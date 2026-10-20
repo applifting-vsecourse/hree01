@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class ListQuacksQueryDto {
   @ApiPropertyOptional({
@@ -12,4 +12,13 @@ export class ListQuacksQueryDto {
   @IsString()
   @MaxLength(100)
   q?: string;
+
+  @ApiPropertyOptional({
+    description: 'Only return quacks written by this user',
+    example: 'u1',
+  })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  authorId?: string;
 }
