@@ -45,6 +45,12 @@ The team may talk to you in another language (often Czech). Answer in that langu
 
 Test data that needs accented characters (e.g. diacritics-insensitive matching) uses English words that have them — "café", "naïve" — not words from the conversation's language. Proper names stay as they are.
 
+### Start from what's on GitHub
+
+Pull requests are merged on GitHub, so the local `main` is often behind. Before creating a branch, comparing with `main` or deciding what is merged, run `git fetch --prune origin` and fast-forward the local `main` (`git fetch origin main:main` when it isn't checked out). Base new branches on the up-to-date `main`.
+
+Every time, tell the user that you fetched and what changed — e.g. "Fetched: `main` moved 23 commits (polls, settings merged); 3 remote branches deleted" or "Fetched: nothing new". It reminds them that local and GitHub can drift.
+
 ### The app is already running
 
 Assume the dev servers are up. If something is listening on the app's ports, that is this application: use it. Don't start a second instance, don't restart it, don't run `pnpm dev`.
