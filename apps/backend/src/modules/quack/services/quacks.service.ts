@@ -31,9 +31,13 @@ export class QuacksService {
    * keeps diacritics-insensitive matching free of database extensions. Revisit
    * when the feed gets pagination.
    */
-  async searchQuacks(user: Identity, query: string): Promise<FeedQuack[]> {
+  async searchQuacks(
+    user: Identity,
+    query: string,
+    filter: { authorId?: string } = {},
+  ): Promise<FeedQuack[]> {
     const terms = parseSearchTerms(query);
-    const quacks = await this.quackRepository.getQuacks();
+    const quacks = await this.quackRepository.getQuacks(filter);
     if (terms.length === 0) return this.withPollViews(quacks, user);
 
     const results = quacks.filter((quack) => matchesSearchTerms(quack, terms));
@@ -97,6 +101,19 @@ export class QuacksService {
         throw new ForbiddenException('Only the author can close this poll');
       case 'ok':
         return this.getPollView(user, quackId);
+    }
+  }
+
+  async deleteQuack(user: Identity, quackId: string): Promise<void> {
+    const result = await this.quackRepository.deleteQuack(quackId, user.id);
+    switch (result) {
+      case 'not_found':
+        throw new NotFoundException('Quack not found');
+      case 'forbidden':
+        // the API enforces this, not just the UI
+        throw new ForbiddenException('You can only delete your own quacks');
+      case 'ok':
+        return;
     }
   }
 

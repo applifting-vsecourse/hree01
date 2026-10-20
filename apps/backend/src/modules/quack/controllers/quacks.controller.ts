@@ -44,7 +44,9 @@ export class QuacksController {
   constructor(private readonly quacksService: QuacksService) {}
 
   @Get()
-  @ApiOperation({ summary: 'List all quacks, optionally filtered by a search' })
+  @ApiOperation({
+    summary: 'List all quacks, optionally filtered by a search or an author',
+  })
   @ApiResponse({ status: 200, type: [QuackResponseDto] })
   @ApiResponse({ status: 400, description: 'Search query too long' })
   @ApiResponse({ status: 401, description: 'Not signed in' })
@@ -52,7 +54,9 @@ export class QuacksController {
     @User() user: Identity,
     @Query() query: ListQuacksQueryDto,
   ): Promise<QuackResponseDto[]> {
-    const quacks = await this.quacksService.searchQuacks(user, query.q ?? '');
+    const quacks = await this.quacksService.searchQuacks(user, query.q ?? '', {
+      authorId: query.authorId,
+    });
     return quacks.map(QuackResponseDto.fromDomain);
   }
 
@@ -76,6 +80,20 @@ export class QuacksController {
         : null,
     });
     return QuackResponseDto.fromDomain(quack);
+  }
+
+  @Delete(':quackId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Delete a quack, with its poll (author only)' })
+  @ApiResponse({ status: 204, description: 'Deleted' })
+  @ApiResponse({ status: 401, description: 'Not signed in' })
+  @ApiResponse({ status: 403, description: 'Not the author of the quack' })
+  @ApiResponse({ status: 404, description: 'Quack not found' })
+  async delete(
+    @User() user: Identity,
+    @Param('quackId') quackId: string,
+  ): Promise<void> {
+    await this.quacksService.deleteQuack(user, quackId);
   }
 
   @Put(':quackId/vote')

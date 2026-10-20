@@ -1,3 +1,4 @@
+import type { ReactNode } from "react"
 import { Loader2, RefreshCw } from "lucide-react"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -14,6 +15,10 @@ type QuackListProps = {
   /** The active search, if any — changes what the empty state says. */
   search?: string
   onClearSearch?: () => void
+  /** The signed-in user; their own quacks get a delete action. */
+  currentUserId?: string
+  /** Replaces the default "No quacks yet" when there is no search. */
+  emptyState?: ReactNode
 }
 
 export function QuackList({
@@ -23,6 +28,8 @@ export function QuackList({
   onReload,
   search,
   onClearSearch,
+  currentUserId,
+  emptyState,
 }: QuackListProps) {
   return (
     <div className="flex flex-col">
@@ -71,16 +78,19 @@ export function QuackList({
         </div>
       ) : null}
 
-      {!isLoading && !error && quacks.length === 0 && !search ? (
-        <p className="py-8 text-center text-sm text-muted-foreground">
-          No quacks yet. Post the first one.
-        </p>
-      ) : null}
+      {!isLoading && !error && quacks.length === 0 && !search
+        ? (emptyState ?? (
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              No quacks yet. Post the first one.
+            </p>
+          ))
+        : null}
 
       {quacks.map((quack) => (
         <QuackItem
           key={quack.id}
           quack={quack}
+          canDelete={currentUserId !== undefined && quack.userId === currentUserId}
         />
       ))}
     </div>

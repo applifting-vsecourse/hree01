@@ -1,11 +1,12 @@
+import { createRef } from "react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { render, screen } from "@testing-library/react"
+import { act, render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { addQuack } from "@/features/quack/api/addQuack"
 import type { Quack } from "@/features/quack/api/quackSchemas"
-import { QuackForm } from "@/features/quack/components/QuackForm"
+import { QuackForm, type QuackFormHandle } from "@/features/quack/components/QuackForm"
 
 vi.mock("@/features/quack/api/addQuack", () => ({ addQuack: vi.fn() }))
 
@@ -19,6 +20,22 @@ const renderForm = () =>
 const question = () => screen.getByLabelText("New quack")
 const optionInput = (n: number) => screen.getByLabelText(`Option ${n}`)
 const addPoll = () => userEvent.click(screen.getByRole("button", { name: "Add poll" }))
+
+describe("QuackForm", () => {
+  it("can be focused from outside, e.g. from an empty feed", async () => {
+    const ref = createRef<QuackFormHandle>()
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <QuackForm ref={ref} />
+      </QueryClientProvider>,
+    )
+
+    act(() => ref.current?.focus())
+
+    // react-hook-form focuses on the next tick
+    await waitFor(() => expect(question()).toHaveFocus())
+  })
+})
 
 describe("QuackForm poll", () => {
   beforeEach(() => {

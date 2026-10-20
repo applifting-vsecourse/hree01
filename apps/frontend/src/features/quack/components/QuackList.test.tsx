@@ -1,5 +1,6 @@
 // Example component test — the pattern to copy for your own components.
-import { render, screen } from "@testing-library/react"
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
+import { render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { describe, expect, it, vi } from "vitest"
 
@@ -41,6 +42,54 @@ describe("QuackList", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Clear search" }))
     expect(onClearSearch).toHaveBeenCalledOnce()
+  })
+
+  it("offers delete only on the signed-in user's own quacks", () => {
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <QuackList
+          currentUserId="u1"
+          quacks={[
+            quack({ id: "mine", text: "my quack" }),
+            quack({
+              id: "theirs",
+              text: "their quack",
+              userId: "u2",
+              user: { id: "u2", name: "Naïve Goose", username: "NaiveGoose" },
+            }),
+          ]}
+        />
+      </QueryClientProvider>,
+    )
+
+    const [mine, theirs] = screen.getAllByRole("article")
+    expect(within(mine!).getByRole("button", { name: "Delete quack" })).toBeInTheDocument()
+    expect(within(theirs!).queryByRole("button", { name: "Delete quack" })).not.toBeInTheDocument()
+  })
+
+  it("shows a custom empty state when there is no search", () => {
+    render(
+      <QuackList
+        quacks={[]}
+        emptyState={<p>You haven&apos;t posted any quacks yet.</p>}
+      />,
+    )
+
+    expect(screen.getByText("You haven't posted any quacks yet.")).toBeInTheDocument()
+    expect(screen.queryByText(/No quacks yet/)).not.toBeInTheDocument()
+  })
+
+  it("explains an empty search even with a custom empty state", () => {
+    render(
+      <QuackList
+        quacks={[]}
+        search="pond"
+        emptyState={<p>You haven&apos;t posted any quacks yet.</p>}
+      />,
+    )
+
+    expect(screen.getByText("No quacks match “pond”.")).toBeInTheDocument()
+    expect(screen.queryByText(/You haven't posted/)).not.toBeInTheDocument()
   })
 
   it("shows the mood of a quack that has one", () => {
