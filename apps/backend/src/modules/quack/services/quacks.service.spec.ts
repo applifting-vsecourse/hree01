@@ -115,7 +115,7 @@ describe('QuacksService', () => {
     log.mockRestore();
   });
 
-  it('passes the author filter to the repository and still searches', async () => {
+  it("filters to the signed-in user's quacks and still searches", async () => {
     const mine = aQuack({ id: 'q1', text: 'Ducks by the café' });
     const repository = mock<QuackRepository>();
     repository.getQuacks.mockResolvedValue([mine]);
@@ -124,9 +124,19 @@ describe('QuacksService', () => {
     jest.spyOn(Logger.prototype, 'log').mockImplementation();
 
     await expect(
-      service.searchQuacks(user, 'cafe', { authorId: 'u1' }),
+      service.searchQuacks(user, 'cafe', { mine: true }),
     ).resolves.toEqual([mine]);
+    // the author is the session's user
     expect(repository.getQuacks).toHaveBeenCalledWith({ authorId: 'u1' });
+  });
+
+  it('does not filter by author unless asked for "mine"', async () => {
+    const repository = mock<QuackRepository>();
+    repository.getQuacks.mockResolvedValue([]);
+
+    await new QuacksService(repository).searchQuacks(user, '');
+
+    expect(repository.getQuacks).toHaveBeenCalledWith({ authorId: undefined });
   });
 
   it('creates a quack owned by the signed-in user', async () => {

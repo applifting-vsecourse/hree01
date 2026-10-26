@@ -72,3 +72,30 @@ test("nobody can delete someone else's quack", async ({ browser }) => {
     await page.context().close()
   }
 })
+
+test("Mine shows only my quacks and never sends a user id", async ({ page }) => {
+  await signIn(page, "caffeinatedduck@example.com", "password1")
+  const session = await (await page.request.get(`${API}/auth/get-session`)).json()
+  const myId: string = session.user.id
+
+  const feedRequest = page.waitForRequest(
+    (request) => request.url().startsWith(`${API}/quacks`) && request.method() === "GET",
+  )
+  await page.goto("/quacks?feed=mine")
+  const request = await feedRequest
+
+  // The server works out who "mine" is from the session.
+  expect(new URL(request.url()).searchParams.get("mine")).toBe("true")
+  expect(request.url()).not.toContain(myId)
+  expect(page.url()).not.toContain(myId)
+
+  const mine = page.getByRole("tabpanel").getByRole("article")
+  await expect(mine.first()).toBeVisible()
+  for (const quack of await mine.all()) {
+    await expect(quack).toContainText("@CaffeinatedDuck")
+  }
+
+  // Asking for someone else's quacks by id isn't possible.
+  const response = await page.request.get(`${API}/quacks?authorId=${myId}`)
+  expect(response.status()).toBe(400)
+})

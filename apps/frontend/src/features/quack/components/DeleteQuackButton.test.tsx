@@ -52,7 +52,7 @@ describe("DeleteQuackButton", () => {
     vi.mocked(deleteQuack).mockResolvedValue()
     const queryClient = renderWithClient(<DeleteQuackButton quackId="q1" />)
     queryClient.setQueryData(quackKeys.list(""), [aQuack("q1"), aQuack("q2")])
-    queryClient.setQueryData(quackKeys.list("", "u1"), [aQuack("q1")])
+    queryClient.setQueryData(quackKeys.list("", true), [aQuack("q1")])
 
     await openDialog()
     await userEvent.click(screen.getByRole("button", { name: "Delete" }))
@@ -60,7 +60,7 @@ describe("DeleteQuackButton", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument())
     expect(vi.mocked(deleteQuack).mock.calls[0]?.[0]).toBe("q1")
     expect(queryClient.getQueryData<Quack[]>(quackKeys.list(""))?.map((q) => q.id)).toEqual(["q2"])
-    expect(queryClient.getQueryData<Quack[]>(quackKeys.list("", "u1"))).toEqual([])
+    expect(queryClient.getQueryData<Quack[]>(quackKeys.list("", true))).toEqual([])
   })
 
   it("keeps the dialog open with the API's message when deleting fails", async () => {

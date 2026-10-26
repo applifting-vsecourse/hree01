@@ -107,13 +107,9 @@ type FeedListProps = {
 }
 
 function FeedList({ feed, search, onClearSearch, onCompose }: FeedListProps) {
-  // The protected layout has already resolved the session, so the user is set.
+  // Only decides which quacks get a delete action; it is never sent to the API.
   const { user } = useSession()
-  const authorId = feed === "mine" ? user?.id : undefined
-  const quacksQuery = useQuery({
-    ...quacksQueryOptions(search, authorId),
-    enabled: feed === "all" || authorId !== undefined,
-  })
+  const quacksQuery = useQuery(quacksQueryOptions(search, feed === "mine"))
 
   return (
     <QuackList
