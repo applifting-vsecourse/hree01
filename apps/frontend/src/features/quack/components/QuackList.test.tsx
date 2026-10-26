@@ -65,6 +65,33 @@ describe("QuackList", () => {
     const [mine, theirs] = screen.getAllByRole("article")
     expect(within(mine!).getByRole("button", { name: "Delete quack" })).toBeInTheDocument()
     expect(within(theirs!).queryByRole("button", { name: "Delete quack" })).not.toBeInTheDocument()
+    expect(within(theirs!).queryByRole("button", { name: "Remove" })).not.toBeInTheDocument()
+  })
+
+  it("lets a moderator remove other people's quacks and delete their own as usual", () => {
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <QuackList
+          currentUserId="u1"
+          isModerator
+          quacks={[
+            quack({ id: "mine", text: "my quack" }),
+            quack({
+              id: "theirs",
+              text: "their quack",
+              userId: "u2",
+              user: { id: "u2", name: "Naïve Goose", username: "NaiveGoose" },
+            }),
+          ]}
+        />
+      </QueryClientProvider>,
+    )
+
+    const [mine, theirs] = screen.getAllByRole("article")
+    expect(within(mine!).getByRole("button", { name: "Delete quack" })).toBeInTheDocument()
+    expect(within(mine!).queryByRole("button", { name: "Remove" })).not.toBeInTheDocument()
+    expect(within(theirs!).getByRole("button", { name: "Remove" })).toBeInTheDocument()
+    expect(within(theirs!).queryByRole("button", { name: "Delete quack" })).not.toBeInTheDocument()
   })
 
   it("shows a custom empty state when there is no search", () => {

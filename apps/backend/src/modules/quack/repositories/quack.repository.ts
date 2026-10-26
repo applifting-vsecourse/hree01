@@ -11,7 +11,6 @@ import { Injectable } from '@nestjs/common';
 
 export type SetVoteResult = 'ok' | 'not_found' | 'closed' | 'invalid_option';
 export type ClosePollResult = 'ok' | 'not_found' | 'forbidden';
-export type DeleteQuackResult = 'ok' | 'not_found' | 'forbidden';
 
 // Loaded with every quack, so the feed gets its polls in the same query.
 const quackInclude = {
@@ -187,25 +186,24 @@ export class QuackRepository {
     });
   }
 
-  /**
-   * Deletes the quack if `userId` wrote it. Ownership is part of the delete
-   * itself, so there is no gap between checking and deleting. The poll, its
-   * options and votes go with it (cascade).
-   */
-  async deleteQuack(
-    quackId: string,
-    userId: string,
-  ): Promise<DeleteQuackResult> {
-    const { count } = await this.prisma.quack.deleteMany({
-      where: { id: quackId, userId },
-    });
-    if (count > 0) return 'ok';
-    // Nothing deleted: tell "someone else's" apart from "doesn't exist".
-    const exists = await this.prisma.quack.findUnique({
+  /** The quack's author, or null when there is no such quack. */
+  async getQuackAuthorId(quackId: string): Promise<string | null> {
+    const quack = await this.prisma.quack.findUnique({
       where: { id: quackId },
-      select: { id: true },
+      select: { userId: true },
     });
-    return exists ? 'forbidden' : 'not_found';
+    return quack?.userId ?? null;
+  }
+
+  /**
+   * Deletes the quack; the poll, its options and votes go with it (cascade).
+   * Returns false when it was already gone. Who may delete is the service's call.
+   */
+  async deleteQuack(quackId: string): Promise<boolean> {
+    const { count } = await this.prisma.quack.deleteMany({
+      where: { id: quackId },
+    });
+    return count > 0;
   }
 
   async createQuack(createQuackData: {

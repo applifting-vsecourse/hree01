@@ -17,6 +17,8 @@ type QuackListProps = {
   onClearSearch?: () => void
   /** The signed-in user; their own quacks get a delete action. */
   currentUserId?: string
+  /** A moderator (admin) can also remove everyone else's quacks. */
+  isModerator?: boolean
   /** Replaces the default "No quacks yet" when there is no search. */
   emptyState?: ReactNode
 }
@@ -29,6 +31,7 @@ export function QuackList({
   search,
   onClearSearch,
   currentUserId,
+  isModerator = false,
   emptyState,
 }: QuackListProps) {
   return (
@@ -90,7 +93,13 @@ export function QuackList({
         <QuackItem
           key={quack.id}
           quack={quack}
-          canDelete={currentUserId !== undefined && quack.userId === currentUserId}
+          deleteAction={
+            currentUserId !== undefined && quack.userId === currentUserId
+              ? "own"
+              : isModerator
+                ? "moderate"
+                : null
+          }
         />
       ))}
     </div>

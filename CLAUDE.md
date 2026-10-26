@@ -47,7 +47,7 @@ Test data that needs accented characters (e.g. diacritics-insensitive matching) 
 
 ### Start from what's on GitHub
 
-Pull requests are merged on GitHub, so the local `main` is often behind. Before creating a branch, comparing with `main` or deciding what is merged, run `git fetch --prune origin` and fast-forward the local `main` (`git fetch origin main:main` when it isn't checked out). Base new branches on the up-to-date `main`.
+Pull requests are merged on GitHub, so the local `main` is often behind. Before creating a branch, comparing with `main` or deciding what is merged, run `git fetch --prune origin` and fast-forward the local `main` (`git fetch origin main:main` when it isn't checked out). Base new branches on the up-to-date `main`. A branch that depends on work not merged yet is based on that work's branch instead; say so to the user, and in the PR, which should wait for (or target) the branch it builds on. Once that branch is merged, the PR goes against `main`.
 
 Every time, tell the user that you fetched and what changed — e.g. "Fetched: `main` moved 23 commits (polls, settings merged); 3 remote branches deleted" or "Fetched: nothing new". It reminds them that local and GitHub can drift.
 

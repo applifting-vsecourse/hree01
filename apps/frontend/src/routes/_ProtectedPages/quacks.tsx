@@ -107,7 +107,8 @@ type FeedListProps = {
 }
 
 function FeedList({ feed, search, onClearSearch, onCompose }: FeedListProps) {
-  // Only decides which quacks get a delete action; it is never sent to the API.
+  // Only decides which quacks get a delete action; it is never sent to the API,
+  // and the server checks the same rule on every delete.
   const { user } = useSession()
   const quacksQuery = useQuery(quacksQueryOptions(search, feed === "mine"))
 
@@ -122,6 +123,7 @@ function FeedList({ feed, search, onClearSearch, onCompose }: FeedListProps) {
       search={search}
       onClearSearch={onClearSearch}
       currentUserId={user?.id}
+      isModerator={user?.role === "admin"}
       emptyState={
         feed === "mine" ? (
           <div className="flex flex-col items-center gap-3 py-8">
