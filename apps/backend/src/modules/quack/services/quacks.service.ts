@@ -34,10 +34,13 @@ export class QuacksService {
   async searchQuacks(
     user: Identity,
     query: string,
-    filter: { authorId?: string } = {},
+    filter: { mine?: boolean } = {},
   ): Promise<FeedQuack[]> {
     const terms = parseSearchTerms(query);
-    const quacks = await this.quackRepository.getQuacks(filter);
+    const quacks = await this.quackRepository.getQuacks({
+      // "mine" is whoever is signed in, never an id from the request
+      authorId: filter.mine ? user.id : undefined,
+    });
     if (terms.length === 0) return this.withPollViews(quacks, user);
 
     const results = quacks.filter((quack) => matchesSearchTerms(quack, terms));

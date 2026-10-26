@@ -55,7 +55,7 @@ export class QuacksController {
     @Query() query: ListQuacksQueryDto,
   ): Promise<QuackResponseDto[]> {
     const quacks = await this.quacksService.searchQuacks(user, query.q ?? '', {
-      authorId: query.authorId,
+      mine: query.mine ?? false,
     });
     return quacks.map(QuackResponseDto.fromDomain);
   }
