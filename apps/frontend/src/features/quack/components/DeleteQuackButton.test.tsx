@@ -1,6 +1,6 @@
 import type { ReactNode } from "react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { render, screen, waitFor } from "@testing-library/react"
+import { render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
@@ -61,6 +61,25 @@ describe("DeleteQuackButton", () => {
     expect(vi.mocked(deleteQuack).mock.calls[0]?.[0]).toBe("q1")
     expect(queryClient.getQueryData<Quack[]>(quackKeys.list(""))?.map((q) => q.id)).toEqual(["q2"])
     expect(queryClient.getQueryData<Quack[]>(quackKeys.list("", true))).toEqual([])
+  })
+
+  it("as a moderator, says whose quack is being removed and removes it", async () => {
+    vi.mocked(deleteQuack).mockResolvedValue()
+    renderWithClient(
+      <DeleteQuackButton
+        quackId="q1"
+        moderatedUsername="BreadCritic"
+      />,
+    )
+
+    await userEvent.click(screen.getByRole("button", { name: "Remove" }))
+    const dialog = screen.getByRole("dialog", { name: "Remove @BreadCritic's quack?" })
+    expect(dialog).toHaveTextContent("You're removing it as a moderator.")
+
+    await userEvent.click(within(dialog).getByRole("button", { name: "Remove" }))
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument())
+    expect(vi.mocked(deleteQuack).mock.calls[0]?.[0]).toBe("q1")
   })
 
   it("keeps the dialog open with the API's message when deleting fails", async () => {

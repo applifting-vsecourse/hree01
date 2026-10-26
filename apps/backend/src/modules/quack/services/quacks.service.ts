@@ -107,16 +107,35 @@ export class QuacksService {
     }
   }
 
+  /** The author deletes their own quack; an admin (moderator) can delete any. */
   async deleteQuack(user: Identity, quackId: string): Promise<void> {
-    const result = await this.quackRepository.deleteQuack(quackId, user.id);
-    switch (result) {
-      case 'not_found':
-        throw new NotFoundException('Quack not found');
-      case 'forbidden':
-        // the API enforces this, not just the UI
-        throw new ForbiddenException('You can only delete your own quacks');
-      case 'ok':
-        return;
+    const authorId = await this.quackRepository.getQuackAuthorId(quackId);
+    if (!authorId) throw new NotFoundException('Quack not found');
+
+    // The one permission check. It is here, not in the UI, so it also holds
+    // for direct API calls. A quack's author never changes, so checking first
+    // and deleting after leaves no gap.
+    const isOwner = authorId === user.id;
+    const isAdmin = user.role === 'admin';
+    if (!isOwner && !isAdmin) {
+      throw new ForbiddenException('You can only delete your own quacks');
+    }
+
+    const deleted = await this.quackRepository.deleteQuack(quackId);
+    // someone else deleted it between the lookup and now
+    if (!deleted) throw new NotFoundException('Quack not found');
+
+    if (!isOwner) {
+      // Moderation trail: who removed whose quack. The text is deliberately not logged.
+      this.logger.log(
+        JSON.stringify({
+          event: 'quacks.moderated_delete',
+          moderatorId: user.id,
+          authorId,
+          quackId,
+          at: new Date().toISOString(),
+        }),
+      );
     }
   }
 

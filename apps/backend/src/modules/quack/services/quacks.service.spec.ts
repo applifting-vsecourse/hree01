@@ -11,7 +11,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { mock } from 'jest-mock-extended';
+import { mock, MockProxy } from 'jest-mock-extended';
 import { QuacksService } from './quacks.service';
 
 const aQuack = (overrides: Partial<Quack> = {}): Quack => ({
@@ -310,35 +310,91 @@ describe('QuacksService', () => {
   });
 
   describe('deleting', () => {
-    it("deletes the signed-in user's own quack", async () => {
+    const author = { id: 'u1', role: 'user' } as Identity;
+    const someoneElse = { id: 'u2', role: 'user' } as Identity;
+    const admin = { id: 'a1', role: 'admin' } as Identity;
+
+    const repositoryWithQuackBy = (
+      authorId: string | null,
+    ): MockProxy<QuackRepository> => {
       const repository = mock<QuackRepository>();
-      repository.deleteQuack.mockResolvedValue('ok');
+      repository.getQuackAuthorId.mockResolvedValue(authorId);
+      repository.deleteQuack.mockResolvedValue(true);
+      return repository;
+    };
+
+    it("deletes the signed-in user's own quack, without a moderation log", async () => {
+      const repository = repositoryWithQuackBy('u1');
+      const log = jest.spyOn(Logger.prototype, 'log').mockImplementation();
 
       await expect(
-        new QuacksService(repository).deleteQuack(user, 'q1'),
+        new QuacksService(repository).deleteQuack(author, 'q1'),
       ).resolves.toBeUndefined();
 
-      // the author comes from the session, not from the caller
-      expect(repository.deleteQuack).toHaveBeenCalledWith('q1', 'u1');
+      expect(repository.deleteQuack).toHaveBeenCalledWith('q1');
+      expect(log).not.toHaveBeenCalled();
     });
 
-    it("refuses to delete someone else's quack", async () => {
-      const repository = mock<QuackRepository>();
-      repository.deleteQuack.mockResolvedValue('forbidden');
+    it("refuses to delete someone else's quack for a regular user", async () => {
+      const repository = repositoryWithQuackBy('u1');
 
-      const remove = new QuacksService(repository).deleteQuack(user, 'q1');
+      const remove = new QuacksService(repository).deleteQuack(
+        someoneElse,
+        'q1',
+      );
 
       await expect(remove).rejects.toBeInstanceOf(ForbiddenException);
       await expect(remove).rejects.toThrow(
         'You can only delete your own quacks',
       );
+      expect(repository.deleteQuack).not.toHaveBeenCalled();
+    });
+
+    it("lets an admin remove anyone's quack and logs it without the text", async () => {
+      const repository = repositoryWithQuackBy('u1');
+      const log = jest.spyOn(Logger.prototype, 'log').mockImplementation();
+
+      await new QuacksService(repository).deleteQuack(admin, 'q1');
+
+      expect(repository.deleteQuack).toHaveBeenCalledWith('q1');
+      expect(log).toHaveBeenCalledTimes(1);
+      const entry = JSON.parse(log.mock.calls[0][0] as string) as Record<
+        string,
+        unknown
+      >;
+      expect(entry).toMatchObject({
+        event: 'quacks.moderated_delete',
+        moderatorId: 'a1',
+        authorId: 'u1',
+        quackId: 'q1',
+      });
+      expect(Object.keys(entry)).not.toContain('text');
+    });
+
+    it('treats an admin deleting their own quack as an ordinary delete', async () => {
+      const repository = repositoryWithQuackBy('a1');
+      const log = jest.spyOn(Logger.prototype, 'log').mockImplementation();
+
+      await new QuacksService(repository).deleteQuack(admin, 'q1');
+
+      expect(repository.deleteQuack).toHaveBeenCalledWith('q1');
+      expect(log).not.toHaveBeenCalled();
     });
 
     it('reports a quack that does not exist', async () => {
-      const repository = mock<QuackRepository>();
-      repository.deleteQuack.mockResolvedValue('not_found');
+      const repository = repositoryWithQuackBy(null);
 
-      const remove = new QuacksService(repository).deleteQuack(user, 'q1');
+      const remove = new QuacksService(repository).deleteQuack(admin, 'q1');
+
+      await expect(remove).rejects.toBeInstanceOf(NotFoundException);
+      expect(repository.deleteQuack).not.toHaveBeenCalled();
+    });
+
+    it('reports a quack that disappeared before it could be deleted', async () => {
+      const repository = repositoryWithQuackBy('u1');
+      repository.deleteQuack.mockResolvedValue(false);
+
+      const remove = new QuacksService(repository).deleteQuack(author, 'q1');
 
       await expect(remove).rejects.toBeInstanceOf(NotFoundException);
     });
