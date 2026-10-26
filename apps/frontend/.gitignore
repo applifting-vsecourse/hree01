@@ -7,6 +7,11 @@
 
 # testing
 /coverage
+# Playwright: results, screenshots and traces of each run
+/test-results
+/playwright-report
+/blob-report
+/playwright/.cache
 
 # production
 /build
