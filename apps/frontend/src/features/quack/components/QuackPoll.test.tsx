@@ -34,6 +34,8 @@ const aQuack = (poll: Poll): Quack => ({
   mood: null,
   userId: "u2",
   createdAt: new Date("2026-01-01T12:00:00Z"),
+  deletedBy: null,
+  replyCount: 0,
   user: { id: "u2", name: "The Bread Critic", username: "BreadCritic" },
   poll,
 })

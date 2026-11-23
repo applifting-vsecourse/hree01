@@ -30,18 +30,37 @@ export const pollSchema = z.object({
   ),
 })
 
+export const quackDeletedBy = ["author", "moderator"] as const
+
+// A quack is live, or a placeholder for a deleted quack that others replied to.
+// A placeholder has `deletedBy` set and no text, mood, poll or author — the
+// server sends none of them, so the UI can't show what was deleted.
 export const quackSchema = z.object({
   id: z.string(),
-  text: z.string(),
+  text: z.string().nullable(),
   mood: moodSchema.nullable(),
-  userId: z.string(),
+  userId: z.string().nullable(),
   createdAt: z.coerce.date(),
-  user: quackUserSchema,
+  user: quackUserSchema.nullable(),
   poll: pollSchema.nullable(),
+  deletedBy: z.enum(quackDeletedBy).nullable(),
+  replyCount: z.number().int(),
 })
 
 export const quacksSchema = z.array(quackSchema)
 
+export const replySchema = z.object({
+  id: z.string(),
+  text: z.string(),
+  quackId: z.string(),
+  userId: z.string(),
+  createdAt: z.coerce.date(),
+  user: quackUserSchema,
+})
+
+export const repliesSchema = z.array(replySchema)
+
 export type QuackMood = Mood
 export type Poll = z.infer<typeof pollSchema>
 export type Quack = z.infer<typeof quackSchema>
+export type Reply = z.infer<typeof replySchema>

@@ -24,6 +24,8 @@ const SAMPLE_QUACKS: Quack[] = [
     poll: null,
     userId: "sample-user-1",
     createdAt: new Date("2026-09-22T09:12:00"),
+    deletedBy: null,
+    replyCount: 0,
     user: { id: "sample-user-1", name: "Caffeinated Duck", username: "CaffeinatedDuck" },
   },
   {
@@ -33,6 +35,8 @@ const SAMPLE_QUACKS: Quack[] = [
     poll: null,
     userId: "sample-user-2",
     createdAt: new Date("2026-09-22T08:40:00"),
+    deletedBy: null,
+    replyCount: 0,
     user: { id: "sample-user-2", name: "Deep Duck Thoughts", username: "DeepDuckThoughts" },
   },
 ]
@@ -100,6 +104,7 @@ function LandingPage() {
               <QuackItem
                 key={quack.id}
                 quack={quack}
+                shouldShowReplies={false}
               />
             ))}
           </div>

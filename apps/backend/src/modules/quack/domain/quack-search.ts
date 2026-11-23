@@ -20,9 +20,11 @@ export const parseSearchTerms = (query: string): string[] =>
 
 /**
  * A quack matches when every term appears (as a substring) in its text,
- * its author's name or its author's username.
+ * its author's name or its author's username. A placeholder (a deleted quack
+ * kept for its replies) never matches, not even by its author.
  */
 export const matchesSearchTerms = (quack: Quack, terms: string[]): boolean => {
+  if (quack.text === null) return false;
   const fields = [
     quack.text,
     quack.user?.name ?? '',

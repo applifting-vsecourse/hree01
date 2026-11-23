@@ -24,9 +24,11 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { CreateQuackDto } from './dto/create-quack.dto';
+import { CreateReplyDto } from './dto/create-reply.dto';
 import { ListQuacksQueryDto } from './dto/list-quacks.query.dto';
 import { PollResponseDto } from './dto/poll.response.dto';
 import { QuackResponseDto } from './dto/quack.response.dto';
+import { ReplyResponseDto } from './dto/reply.response.dto';
 import { VoteDto } from './dto/vote.dto';
 
 @ApiTags('quacks')
@@ -86,19 +88,78 @@ export class QuacksController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     summary: 'Delete a quack, with its poll (its author, or an admin)',
+    description:
+      'A quack with replies becomes a placeholder: its text, mood and poll are erased and its replies stay.',
   })
-  @ApiResponse({ status: 204, description: 'Deleted' })
+  @ApiResponse({
+    status: 204,
+    description: 'Deleted, or turned into a placeholder',
+  })
   @ApiResponse({ status: 401, description: 'Not signed in' })
   @ApiResponse({
     status: 403,
     description: 'Neither the author of the quack nor an admin',
   })
-  @ApiResponse({ status: 404, description: 'Quack not found' })
+  @ApiResponse({
+    status: 404,
+    description: 'Quack not found, or already deleted',
+  })
   async delete(
     @User() user: Identity,
     @Param('quackId') quackId: string,
   ): Promise<void> {
     await this.quacksService.deleteQuack(user, quackId);
+  }
+
+  @Get(':quackId/replies')
+  @ApiOperation({ summary: "List a quack's replies, oldest first" })
+  @ApiResponse({ status: 200, type: [ReplyResponseDto] })
+  @ApiResponse({ status: 401, description: 'Not signed in' })
+  @ApiResponse({ status: 404, description: 'Quack not found' })
+  async listReplies(
+    @Param('quackId') quackId: string,
+  ): Promise<ReplyResponseDto[]> {
+    const replies = await this.quacksService.getReplies(quackId);
+    return replies.map(ReplyResponseDto.fromDomain);
+  }
+
+  @Post(':quackId/replies')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Reply to a quack' })
+  @ApiResponse({ status: 201, type: ReplyResponseDto })
+  @ApiResponse({ status: 400, description: 'Text empty or too long' })
+  @ApiResponse({ status: 401, description: 'Not signed in' })
+  @ApiResponse({ status: 404, description: 'Quack not found' })
+  @ApiResponse({ status: 409, description: 'This quack was deleted' })
+  async createReply(
+    @User() user: Identity,
+    @Param('quackId') quackId: string,
+    @Body() body: CreateReplyDto,
+  ): Promise<ReplyResponseDto> {
+    const reply = await this.quacksService.createReply(
+      user,
+      quackId,
+      body.text,
+    );
+    return ReplyResponseDto.fromDomain(reply);
+  }
+
+  @Delete(':quackId/replies/:replyId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Delete a reply (its author, or an admin)' })
+  @ApiResponse({ status: 204, description: 'Deleted' })
+  @ApiResponse({ status: 401, description: 'Not signed in' })
+  @ApiResponse({
+    status: 403,
+    description: 'Neither the author of the reply nor an admin',
+  })
+  @ApiResponse({ status: 404, description: 'Reply not found' })
+  async deleteReply(
+    @User() user: Identity,
+    @Param('quackId') quackId: string,
+    @Param('replyId') replyId: string,
+  ): Promise<void> {
+    await this.quacksService.deleteReply(user, quackId, replyId);
   }
 
   @Put(':quackId/vote')

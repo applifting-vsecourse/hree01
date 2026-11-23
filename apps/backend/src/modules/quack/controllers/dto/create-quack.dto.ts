@@ -1,4 +1,9 @@
-import { QUACK_MOODS, type QuackMood } from '@/modules/quack/domain/quack';
+import {
+  QUACK_MOODS,
+  QUACK_TEXT_MAX_LENGTH,
+  quackTextMessages,
+  type QuackMood,
+} from '@/modules/quack/domain/quack';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
@@ -15,11 +20,11 @@ export class CreateQuackDto {
   @ApiProperty({
     description: 'Body of the quack',
     example: 'Hello, world!',
-    maxLength: 280,
+    maxLength: QUACK_TEXT_MAX_LENGTH,
   })
   @IsString()
-  @IsNotEmpty()
-  @MaxLength(280)
+  @IsNotEmpty({ message: quackTextMessages.empty })
+  @MaxLength(QUACK_TEXT_MAX_LENGTH, { message: quackTextMessages.tooLong })
   text!: string;
 
   @ApiPropertyOptional({

@@ -1,12 +1,15 @@
 import {
   FeedQuack,
+  isPlaceholder,
+  QUACK_DELETED_BY,
   QUACK_MOODS,
+  type QuackDeletedBy,
   type QuackMood,
 } from '@/modules/quack/domain/quack';
 import { ApiProperty } from '@nestjs/swagger';
 import { PollResponseDto } from './poll.response.dto';
 
-class QuackUserDto {
+export class QuackUserDto {
   @ApiProperty()
   id!: string;
 
@@ -21,23 +24,45 @@ export class QuackResponseDto {
   @ApiProperty()
   id!: string;
 
-  @ApiProperty()
-  text!: string;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'Null on a placeholder (a deleted quack kept for its replies)',
+  })
+  text!: string | null;
 
   @ApiProperty({ enum: QUACK_MOODS, nullable: true })
   mood!: QuackMood | null;
 
-  @ApiProperty()
-  userId!: string;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'Null on a placeholder: it shows no author',
+  })
+  userId!: string | null;
 
   @ApiProperty({ type: String, format: 'date-time' })
   createdAt!: Date;
 
-  @ApiProperty({ type: QuackUserDto })
-  user!: QuackUserDto;
+  @ApiProperty({
+    type: QuackUserDto,
+    nullable: true,
+    description: 'Null on a placeholder: it shows no author',
+  })
+  user!: QuackUserDto | null;
 
   @ApiProperty({ type: PollResponseDto, nullable: true })
   poll!: PollResponseDto | null;
+
+  @ApiProperty({
+    enum: QUACK_DELETED_BY,
+    nullable: true,
+    description: 'Set on a placeholder: who deleted it. Null on a live quack.',
+  })
+  deletedBy!: QuackDeletedBy | null;
+
+  @ApiProperty({ description: 'Number of replies, counted on every read' })
+  replyCount!: number;
 
   static fromDomain(quack: FeedQuack): QuackResponseDto {
     if (!quack.user) {
@@ -45,18 +70,24 @@ export class QuackResponseDto {
         `QuackResponseDto.fromDomain expected quack.user to be loaded for quack ${quack.id}`,
       );
     }
+    const isDeleted = isPlaceholder(quack);
     return {
       id: quack.id,
       text: quack.text,
       mood: quack.mood,
-      userId: quack.userId,
+      // The server keeps the owner of a placeholder, but nobody else sees it.
+      userId: isDeleted ? null : quack.userId,
       createdAt: quack.createdAt,
-      user: {
-        id: quack.user.id,
-        name: quack.user.name,
-        username: quack.user.username,
-      },
+      user: isDeleted
+        ? null
+        : {
+            id: quack.user.id,
+            name: quack.user.name,
+            username: quack.user.username,
+          },
       poll: quack.poll ? PollResponseDto.fromDomain(quack.poll) : null,
+      deletedBy: quack.deletedBy,
+      replyCount: quack.replyCount,
     };
   }
 }

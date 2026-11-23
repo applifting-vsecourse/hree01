@@ -9,6 +9,7 @@ import {
   matchesSearchTerms,
   parseSearchTerms,
 } from '@/modules/quack/domain/quack-search';
+import { Reply } from '@/modules/quack/domain/reply';
 import { QuackRepository } from '@/modules/quack/repositories/quack.repository';
 import { Identity } from '@/shared/auth/domain/identity';
 import {
@@ -37,10 +38,13 @@ export class QuacksService {
     filter: { mine?: boolean } = {},
   ): Promise<FeedQuack[]> {
     const terms = parseSearchTerms(query);
-    const quacks = await this.quackRepository.getQuacks({
-      // "mine" is whoever is signed in, never an id from the request
-      authorId: filter.mine ? user.id : undefined,
-    });
+    const quacks = await this.quackRepository.getQuacks(
+      filter.mine
+        ? // "mine" is whoever is signed in, never an id from the request;
+          // a deleted quack kept for its replies is no longer theirs to list
+          { authorId: user.id, liveOnly: true }
+        : {},
+    );
     if (terms.length === 0) return this.withPollViews(quacks, user);
 
     const results = quacks.filter((quack) => matchesSearchTerms(quack, terms));
@@ -107,7 +111,10 @@ export class QuacksService {
     }
   }
 
-  /** The author deletes their own quack; an admin (moderator) can delete any. */
+  /**
+   * The author deletes their own quack; an admin (moderator) can delete any.
+   * A quack with replies becomes a placeholder instead of disappearing.
+   */
   async deleteQuack(user: Identity, quackId: string): Promise<void> {
     const authorId = await this.quackRepository.getQuackAuthorId(quackId);
     if (!authorId) throw new NotFoundException('Quack not found');
@@ -121,9 +128,12 @@ export class QuacksService {
       throw new ForbiddenException('You can only delete your own quacks');
     }
 
-    const deleted = await this.quackRepository.deleteQuack(quackId);
+    const result = await this.quackRepository.deleteQuack(
+      quackId,
+      isOwner ? 'author' : 'moderator',
+    );
     // someone else deleted it between the lookup and now
-    if (!deleted) throw new NotFoundException('Quack not found');
+    if (result === 'not_found') throw new NotFoundException('Quack not found');
 
     if (!isOwner) {
       // Moderation trail: who removed whose quack. The text is deliberately not logged.
@@ -132,6 +142,71 @@ export class QuacksService {
           event: 'quacks.moderated_delete',
           moderatorId: user.id,
           authorId,
+          quackId,
+          at: new Date().toISOString(),
+        }),
+      );
+    }
+  }
+
+  /** A quack's replies, oldest first. A placeholder's replies too. */
+  async getReplies(quackId: string): Promise<Reply[]> {
+    const replies = await this.quackRepository.getReplies(quackId);
+    if (!replies) throw new NotFoundException('Quack not found');
+    return replies;
+  }
+
+  async createReply(
+    user: Identity,
+    quackId: string,
+    text: string,
+  ): Promise<Reply> {
+    const result = await this.quackRepository.createReply({
+      quackId,
+      text,
+      // the author is taken from the session, never from the request body
+      userId: user.id,
+    });
+    switch (result.status) {
+      case 'not_found':
+        throw new NotFoundException('Quack not found');
+      case 'quack_deleted':
+        throw new ConflictException('This quack was deleted');
+      case 'ok':
+        return result.reply;
+    }
+  }
+
+  /** The author deletes their own reply; an admin (moderator) can delete any. */
+  async deleteReply(
+    user: Identity,
+    quackId: string,
+    replyId: string,
+  ): Promise<void> {
+    const authorId = await this.quackRepository.getReplyAuthorId(
+      quackId,
+      replyId,
+    );
+    if (!authorId) throw new NotFoundException('Reply not found');
+
+    // Same rule as for quacks, checked here so it holds for direct API calls.
+    const isOwner = authorId === user.id;
+    const isAdmin = user.role === 'admin';
+    if (!isOwner && !isAdmin) {
+      throw new ForbiddenException('You can only delete your own replies');
+    }
+
+    const deleted = await this.quackRepository.deleteReply(quackId, replyId);
+    if (!deleted) throw new NotFoundException('Reply not found');
+
+    if (!isOwner) {
+      // Moderation trail, like for quacks. The text is deliberately not logged.
+      this.logger.log(
+        JSON.stringify({
+          event: 'replies.moderated_delete',
+          moderatorId: user.id,
+          authorId,
+          replyId,
           quackId,
           at: new Date().toISOString(),
         }),
