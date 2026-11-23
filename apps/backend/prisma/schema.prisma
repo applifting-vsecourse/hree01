@@ -31,18 +31,46 @@ enum QuackMood {
   @@map("quack_mood")
 }
 
+enum QuackDeletedBy {
+  author
+  moderator
+
+  @@map("quack_deleted_by")
+}
+
+// A deleted quack that others replied to stays as a placeholder: text and mood
+// erased, deletedAt/deletedBy set, kept only for its replies (docs/adr/0001).
+// A CHECK constraint in the migration keeps the two states apart.
 model Quack {
-  id        String     @id @default(cuid())
-  text      String     @db.Text
+  id        String          @id @default(cuid())
+  text      String?         @db.Text // null once deleted (placeholder)
   mood      QuackMood?
-  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId    String
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @default(now()) @updatedAt
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @default(now()) @updatedAt
+  deletedAt DateTime? // set = placeholder
+  deletedBy QuackDeletedBy?
   poll      Poll?
+  replies   Reply[]
 
   @@index([userId])
   @@map("quack")
+}
+
+model Reply {
+  id        String   @id @default(cuid())
+  text      String   @db.Text
+  // Restrict: a quack with replies is never hard-deleted, it becomes a placeholder
+  quack     Quack    @relation(fields: [quackId], references: [id], onDelete: Restrict)
+  quackId   String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  createdAt DateTime @default(now())
+
+  @@index([quackId, createdAt]) // a quack's replies in order, and their count
+  @@index([userId])
+  @@map("reply")
 }
 
 enum PollResultsVisibility {
@@ -152,6 +180,7 @@ model User {
   sessions      Session[]
   accounts      Account[]
   quacks        Quack[]
+  replies       Reply[]
   pollVotes     PollVote[]
   role          UserRole   @default(user)
 

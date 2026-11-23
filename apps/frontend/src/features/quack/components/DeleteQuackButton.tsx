@@ -24,10 +24,16 @@ type DeleteQuackButtonProps = {
    * Switches the trash can for a "Remove" action that says whose quack it is.
    */
   moderatedUsername?: string
+  /** Replies keep the quack as a placeholder, so the dialog says what stays. */
+  hasReplies?: boolean
 }
 
 /** Deleting is permanent, so it is confirmed first. */
-export function DeleteQuackButton({ quackId, moderatedUsername }: DeleteQuackButtonProps) {
+export function DeleteQuackButton({
+  quackId,
+  moderatedUsername,
+  hasReplies = false,
+}: DeleteQuackButtonProps) {
   const [isOpen, setIsOpen] = useState(false)
   const deleteQuack = useDeleteQuack()
   const isModerating = moderatedUsername !== undefined
@@ -86,8 +92,10 @@ export function DeleteQuackButton({ quackId, moderatedUsername }: DeleteQuackBut
           </DialogTitle>
           <DialogDescription>
             {isModerating ? "You're removing it as a moderator. " : null}
-            It disappears from the feed for everyone, together with its poll and votes. This
-            can&apos;t be undone.
+            {hasReplies
+              ? "Its text disappears for everyone, together with its poll and votes. Its replies stay visible under a placeholder. "
+              : "It disappears from the feed for everyone, together with its poll and votes. "}
+            This can&apos;t be undone.
           </DialogDescription>
         </DialogHeader>
 

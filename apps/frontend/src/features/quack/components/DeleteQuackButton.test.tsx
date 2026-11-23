@@ -11,13 +11,15 @@ import { DeleteQuackButton } from "@/features/quack/components/DeleteQuackButton
 
 vi.mock("@/features/quack/api/deleteQuack", () => ({ deleteQuack: vi.fn() }))
 
-const aQuack = (id: string): Quack => ({
+const aQuack = (id: string, replyCount = 0): Quack => ({
   id,
   text: "quack quack",
   mood: null,
   poll: null,
   userId: "u1",
   createdAt: new Date("2026-01-01T12:00:00Z"),
+  deletedBy: null,
+  replyCount,
   user: { id: "u1", name: "Caffeinated Duck", username: "CaffeinatedDuck" },
 })
 
@@ -80,6 +82,29 @@ describe("DeleteQuackButton", () => {
 
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument())
     expect(vi.mocked(deleteQuack).mock.calls[0]?.[0]).toBe("q1")
+  })
+
+  it("says the replies stay, and keeps the quack listed until it comes back as a placeholder", async () => {
+    vi.mocked(deleteQuack).mockResolvedValue()
+    const queryClient = renderWithClient(
+      <DeleteQuackButton
+        quackId="q1"
+        hasReplies
+      />,
+    )
+    queryClient.setQueryData(quackKeys.list(""), [aQuack("q1", 2), aQuack("q2")])
+
+    await openDialog()
+    expect(screen.getByRole("dialog", { name: "Delete this quack?" })).toHaveTextContent(
+      "Its replies stay visible under a placeholder.",
+    )
+    await userEvent.click(screen.getByRole("button", { name: "Delete" }))
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument())
+    expect(queryClient.getQueryData<Quack[]>(quackKeys.list(""))?.map((q) => q.id)).toEqual([
+      "q1",
+      "q2",
+    ])
   })
 
   it("keeps the dialog open with the API's message when deleting fails", async () => {

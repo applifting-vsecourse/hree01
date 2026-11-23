@@ -4,6 +4,7 @@ import { BetterAuth } from '@/shared/auth/providers/better-auth.provider';
 import { Config } from '@/shared/config/config.service';
 import { createPoll } from './create-poll';
 import { createQuack } from './create-quack';
+import { createReply } from './create-reply';
 import { createUser } from './create-user';
 
 const MINUTE_IN_MS = 60 * 1000;
@@ -225,5 +226,62 @@ Please stop tagging me.`,
       { userId: breadCritic.id, option: 2 },
       { userId: deepDuckThoughts.id, option: 0 },
     ],
+  });
+
+  console.log('Creating example replies');
+
+  const lunchReplies: { author: User; minutesAgo: number; text: string }[] = [
+    {
+      author: caffeinatedDuck,
+      minutesAgo: 90,
+      text: 'The café, obviously. They have espresso.',
+    },
+    {
+      author: migrationSeason,
+      minutesAgo: 80,
+      text: 'Bakery. Shorter flight.',
+    },
+    {
+      author: breadCritic,
+      minutesAgo: 70,
+      text: 'Leftover crusts is not a serious option and I regret adding it.',
+    },
+  ];
+  for (const { author, minutesAgo, text } of lunchReplies) {
+    await createReply(prisma, {
+      quackId: lunchQuack.id,
+      text,
+      userId: author.id,
+      createdAt: new Date(now - minutesAgo * MINUTE_IN_MS),
+    });
+  }
+
+  // A deleted quack kept as a placeholder for its replies: text and mood
+  // erased, the replies stay (docs/adr/0001).
+  const deletedQuack = await createQuack(prisma, {
+    text: 'Erased by the placeholder update below.',
+    userId: deepDuckThoughts.id,
+    createdAt: new Date(now - 180 * MINUTE_IN_MS),
+  });
+  await createReply(prisma, {
+    quackId: deletedQuack.id,
+    text: 'This one made me think for an entire afternoon.',
+    userId: caffeinatedDuck.id,
+    createdAt: new Date(now - 170 * MINUTE_IN_MS),
+  });
+  await createReply(prisma, {
+    quackId: deletedQuack.id,
+    text: 'Same. Then I had a snack and felt better.',
+    userId: breadCritic.id,
+    createdAt: new Date(now - 160 * MINUTE_IN_MS),
+  });
+  await prisma.quack.update({
+    where: { id: deletedQuack.id },
+    data: {
+      text: null,
+      mood: null,
+      deletedAt: new Date(now - 150 * MINUTE_IN_MS),
+      deletedBy: 'author',
+    },
   });
 };

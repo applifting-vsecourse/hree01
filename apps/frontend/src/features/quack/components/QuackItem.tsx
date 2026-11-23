@@ -5,6 +5,7 @@ import type { Quack } from "@/features/quack/api/quackSchemas"
 import { DeleteQuackButton } from "@/features/quack/components/DeleteQuackButton"
 import { QuackMood } from "@/features/quack/components/QuackMood"
 import { QuackPoll } from "@/features/quack/components/QuackPoll"
+import { QuackReplies } from "@/features/quack/components/QuackReplies"
 import { UsersName } from "@/features/quack/components/UsersName"
 import { UsersUserName } from "@/features/quack/components/UsersUserName"
 
@@ -12,12 +13,54 @@ type QuackItemProps = {
   quack: Quack
   /**
    * Which delete action to offer: the author's own, a moderator's "Remove" on
-   * someone else's quack, or none. Only convenience — the API enforces the rule.
+   * someone else's quack, or none. Only convenience: the API enforces the rule.
    */
   deleteAction?: "own" | "moderate" | null
+  /** The signed-in user and whether they moderate, for the replies' actions. */
+  currentUserId?: string
+  isModerator?: boolean
+  /** Off for static previews, which have no replies to load. */
+  shouldShowReplies?: boolean
 }
 
-export function QuackItem({ quack, deleteAction = null }: QuackItemProps) {
+const articleClassName = "flex w-full gap-4 border-b border-border pt-2 pb-4 last:border-b-0"
+
+export function QuackItem({
+  quack,
+  deleteAction = null,
+  currentUserId,
+  isModerator = false,
+  shouldShowReplies = true,
+}: QuackItemProps) {
+  // A deleted quack that others replied to: no author, text, mood or poll,
+  // only what happened to it and the replies, which can't be added to.
+  if (quack.deletedBy !== null || quack.user === null) {
+    return (
+      <article className={articleClassName}>
+        <div
+          className="size-12 shrink-0"
+          aria-hidden
+        />
+        <div className="flex flex-1 flex-col gap-3">
+          <p className="text-sm text-muted-foreground">
+            {quack.deletedBy === "moderator"
+              ? "This quack was removed by a moderator"
+              : "This quack was deleted"}
+          </p>
+          {shouldShowReplies ? (
+            <QuackReplies
+              quackId={quack.id}
+              replyCount={quack.replyCount}
+              canReply={false}
+              currentUserId={currentUserId}
+              isModerator={isModerator}
+            />
+          ) : null}
+        </div>
+      </article>
+    )
+  }
+
   const { name, username } = quack.user
 
   const initials = name
@@ -28,7 +71,7 @@ export function QuackItem({ quack, deleteAction = null }: QuackItemProps) {
     .toUpperCase()
 
   return (
-    <article className="flex w-full gap-4 border-b border-border pt-2 pb-4 last:border-b-0">
+    <article className={articleClassName}>
       <Avatar className="size-12">
         <AvatarFallback>{initials}</AvatarFallback>
       </Avatar>
@@ -56,12 +99,24 @@ export function QuackItem({ quack, deleteAction = null }: QuackItemProps) {
             />
           </div>
         ) : null}
+        {shouldShowReplies ? (
+          <div className="mt-2">
+            <QuackReplies
+              quackId={quack.id}
+              replyCount={quack.replyCount}
+              canReply
+              currentUserId={currentUserId}
+              isModerator={isModerator}
+            />
+          </div>
+        ) : null}
       </div>
 
       {deleteAction ? (
         <DeleteQuackButton
           quackId={quack.id}
           moderatedUsername={deleteAction === "moderate" ? username : undefined}
+          hasReplies={quack.replyCount > 0}
         />
       ) : null}
     </article>

@@ -10,16 +10,19 @@ import {
 } from "@/features/quack/api/pollLimits"
 import { pollResultsVisibilities } from "@/features/quack/api/quackSchemas"
 
-// Mirrors the server-side DTO (MaxLength(280)) so the user is told before
-// the request is made — the server still validates independently.
+// Mirrors the server (QUACK_TEXT_MAX_LENGTH and quackTextMessages in the
+// backend's domain/quack.ts) so the user is told before the request is made —
+// the server still validates independently. Replies share these rules.
 export const QUACK_MAX_LENGTH = 280
 
+export const quackTextSchema = z
+  .string()
+  .trim()
+  .min(1, "Write something first")
+  .max(QUACK_MAX_LENGTH, `Keep it under ${QUACK_MAX_LENGTH} characters`)
+
 export const quackFormSchema = z.object({
-  text: z
-    .string()
-    .trim()
-    .min(1, "Write something first")
-    .max(QUACK_MAX_LENGTH, `Keep it under ${QUACK_MAX_LENGTH} characters`),
+  text: quackTextSchema,
   mood: moodOptionSchema,
   // No options means no poll; "Add poll" starts it with two empty ones.
   pollOptions: z

@@ -3,20 +3,53 @@ import {
   Poll as PrismaPoll,
   PollOption as PrismaPollOption,
   Quack as PrismaQuack,
+  Reply as PrismaReply,
   User as PrismaUser,
 } from '@/generated/prisma/client';
 import { NewPoll, Poll, PollStats } from '@/modules/quack/domain/poll';
-import { Quack, QuackMood } from '@/modules/quack/domain/quack';
+import {
+  Quack,
+  QuackAuthor,
+  QuackDeletedBy,
+  QuackMood,
+} from '@/modules/quack/domain/quack';
+import { Reply } from '@/modules/quack/domain/reply';
 import { Injectable } from '@nestjs/common';
 
 export type SetVoteResult = 'ok' | 'not_found' | 'closed' | 'invalid_option';
 export type ClosePollResult = 'ok' | 'not_found' | 'forbidden';
+/** `placeholder`: it had replies, so its content was erased and the row kept. */
+export type DeleteQuackResult = 'deleted' | 'placeholder' | 'not_found';
+export type CreateReplyResult =
+  | { status: 'ok'; reply: Reply }
+  | { status: 'not_found' }
+  | { status: 'quack_deleted' };
 
-// Loaded with every quack, so the feed gets its polls in the same query.
+// Loaded with every quack, so the feed gets its polls and reply counts in the
+// same query. The count is computed on every read, never stored.
 const quackInclude = {
   user: true,
   poll: { include: { options: { orderBy: { position: 'asc' } } } },
+  _count: { select: { replies: true } },
 } as const;
+
+const mapPrismaUserToAuthor = (user: PrismaUser): QuackAuthor => ({
+  id: user.id,
+  name: user.name,
+  // the form the author typed; `username` itself is stored lowercased
+  username: user.displayUsername ?? user.username ?? '',
+});
+
+const mapPrismaReplyToDomain = (
+  reply: PrismaReply & { user: PrismaUser },
+): Reply => ({
+  id: reply.id,
+  text: reply.text,
+  quackId: reply.quackId,
+  userId: reply.userId,
+  createdAt: reply.createdAt,
+  user: mapPrismaUserToAuthor(reply.user),
+});
 
 const mapPrismaPollToDomain = (
   poll: PrismaPoll & { options: PrismaPollOption[] },
@@ -34,6 +67,7 @@ const mapPrismaQuackToDomain = (
   quack: PrismaQuack & {
     user?: PrismaUser;
     poll?: (PrismaPoll & { options: PrismaPollOption[] }) | null;
+    _count?: { replies: number };
   },
 ): Quack => ({
   id: quack.id,
@@ -42,14 +76,9 @@ const mapPrismaQuackToDomain = (
   userId: quack.userId,
   createdAt: quack.createdAt,
   updatedAt: quack.updatedAt,
-  user: quack.user
-    ? {
-        id: quack.user.id,
-        name: quack.user.name,
-        // the form the author typed; `username` itself is stored lowercased
-        username: quack.user.displayUsername ?? quack.user.username ?? '',
-      }
-    : undefined,
+  deletedBy: quack.deletedBy,
+  replyCount: quack._count?.replies ?? 0,
+  user: quack.user ? mapPrismaUserToAuthor(quack.user) : undefined,
   poll: quack.poll ? mapPrismaPollToDomain(quack.poll) : null,
 });
 
@@ -61,9 +90,18 @@ const mapPrismaQuackToDomain = (
 export class QuackRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getQuacks(filter: { authorId?: string } = {}): Promise<Quack[]> {
+  /**
+   * The feed, newest first. Placeholders (deleted quacks kept for their
+   * replies) are included unless `liveOnly` is set.
+   */
+  async getQuacks(
+    filter: { authorId?: string; liveOnly?: boolean } = {},
+  ): Promise<Quack[]> {
     const quacks = await this.prisma.quack.findMany({
-      where: { userId: filter.authorId },
+      where: {
+        userId: filter.authorId,
+        deletedAt: filter.liveOnly ? null : undefined,
+      },
       include: quackInclude,
       orderBy: { createdAt: 'desc' },
     });
@@ -186,24 +224,124 @@ export class QuackRepository {
     });
   }
 
-  /** The quack's author, or null when there is no such quack. */
+  /**
+   * The quack's author, or null when there is no such quack or it is already
+   * a placeholder: a deleted quack can't be deleted again.
+   */
   async getQuackAuthorId(quackId: string): Promise<string | null> {
-    const quack = await this.prisma.quack.findUnique({
-      where: { id: quackId },
+    const quack = await this.prisma.quack.findFirst({
+      where: { id: quackId, deletedAt: null },
       select: { userId: true },
     });
     return quack?.userId ?? null;
   }
 
   /**
-   * Deletes the quack; the poll, its options and votes go with it (cascade).
-   * Returns false when it was already gone. Who may delete is the service's call.
+   * Deletes the quack. Without replies the row goes, and the poll, its options
+   * and votes with it (cascade). With replies it becomes a placeholder: text,
+   * mood and poll are erased, the row stays for the replies (docs/adr/0001).
+   * Who may delete is the service's call.
+   *
+   * The quack's row is locked first (posting a reply locks it too), so a
+   * reply can't land between counting the replies and deleting the row.
    */
-  async deleteQuack(quackId: string): Promise<boolean> {
-    const { count } = await this.prisma.quack.deleteMany({
-      where: { id: quackId },
+  async deleteQuack(
+    quackId: string,
+    deletedBy: QuackDeletedBy,
+  ): Promise<DeleteQuackResult> {
+    return this.prisma.$transaction(async (tx) => {
+      const [quack] = await tx.$queryRaw<{ deletedAt: Date | null }[]>`
+        SELECT "deletedAt" FROM "quack" WHERE "id" = ${quackId} FOR UPDATE`;
+      if (!quack || quack.deletedAt) return 'not_found';
+
+      const replyCount = await tx.reply.count({ where: { quackId } });
+      if (replyCount === 0) {
+        await tx.quack.delete({ where: { id: quackId } });
+        return 'deleted';
+      }
+
+      await tx.poll.deleteMany({ where: { quackId } });
+      await tx.quack.update({
+        where: { id: quackId },
+        data: { text: null, mood: null, deletedAt: new Date(), deletedBy },
+      });
+      return 'placeholder';
     });
-    return count > 0;
+  }
+
+  /** The quack's replies, oldest first, or null when there is no such quack. */
+  async getReplies(quackId: string): Promise<Reply[] | null> {
+    const quack = await this.prisma.quack.findUnique({
+      where: { id: quackId },
+      select: {
+        replies: {
+          include: { user: true },
+          orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+        },
+      },
+    });
+    return quack ? quack.replies.map(mapPrismaReplyToDomain) : null;
+  }
+
+  /** Replies to a live quack. Locks it, so it can't be deleted meanwhile. */
+  async createReply(data: {
+    quackId: string;
+    userId: string;
+    text: string;
+  }): Promise<CreateReplyResult> {
+    return this.prisma.$transaction(async (tx) => {
+      const [quack] = await tx.$queryRaw<{ deletedAt: Date | null }[]>`
+        SELECT "deletedAt" FROM "quack" WHERE "id" = ${data.quackId} FOR UPDATE`;
+      if (!quack) return { status: 'not_found' } as const;
+      if (quack.deletedAt) return { status: 'quack_deleted' } as const;
+
+      const reply = await tx.reply.create({
+        data: {
+          text: data.text,
+          quack: { connect: { id: data.quackId } },
+          user: { connect: { id: data.userId } },
+        },
+        include: { user: true },
+      });
+      return { status: 'ok', reply: mapPrismaReplyToDomain(reply) } as const;
+    });
+  }
+
+  /** The reply's author, or null when the quack has no such reply. */
+  async getReplyAuthorId(
+    quackId: string,
+    replyId: string,
+  ): Promise<string | null> {
+    const reply = await this.prisma.reply.findFirst({
+      where: { id: replyId, quackId },
+      select: { userId: true },
+    });
+    return reply?.userId ?? null;
+  }
+
+  /**
+   * Deletes the reply for good. When it was the last reply under a
+   * placeholder, the placeholder goes too. Returns false when the reply was
+   * already gone. Who may delete is the service's call.
+   */
+  async deleteReply(quackId: string, replyId: string): Promise<boolean> {
+    return this.prisma.$transaction(async (tx) => {
+      // Same lock as deleting the quack and posting a reply.
+      const [quack] = await tx.$queryRaw<{ deletedAt: Date | null }[]>`
+        SELECT "deletedAt" FROM "quack" WHERE "id" = ${quackId} FOR UPDATE`;
+      if (!quack) return false;
+
+      const { count } = await tx.reply.deleteMany({
+        where: { id: replyId, quackId },
+      });
+      if (count === 0) return false;
+
+      if (quack.deletedAt) {
+        const remaining = await tx.reply.count({ where: { quackId } });
+        if (remaining === 0) await tx.quack.delete({ where: { id: quackId } });
+      }
+      return true;
+    });
   }
 
   async createQuack(createQuackData: {

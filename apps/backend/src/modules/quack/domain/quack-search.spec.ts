@@ -9,6 +9,8 @@ const aQuack = (overrides: Partial<Quack> = {}): Quack => ({
   userId: 'u1',
   createdAt: new Date('2026-01-01T12:00:00Z'),
   updatedAt: new Date('2026-01-01T12:00:00Z'),
+  deletedBy: null,
+  replyCount: 0,
   user: { id: 'u1', name: 'Caffeinated Duck', username: 'CaffeinatedDuck' },
   ...overrides,
 });
@@ -48,5 +50,10 @@ describe('matchesSearchTerms', () => {
 
   it('does not match when no field contains the term', () => {
     expect(matches('goose')).toBe(false);
+  });
+
+  it('never matches a placeholder, not even by its author', () => {
+    const placeholder = aQuack({ text: null, deletedBy: 'author' });
+    expect(matches('caffeinated', placeholder)).toBe(false);
   });
 });
