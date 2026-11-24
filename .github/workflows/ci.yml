@@ -50,3 +50,113 @@ jobs:
 
       - name: Build frontend
         run: pnpm frontend build
+
+  # Real HTTP requests to the Nest app against a real database. The test setup
+  # applies our Prisma migrations to this database and empties it between tests.
+  test-integration:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: quacker
+          POSTGRES_PASSWORD: quacker
+          POSTGRES_DB: quacker_test
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U quacker -d quacker_test"
+          --health-interval 3s --health-timeout 3s --health-retries 20
+    env:
+      TEST_DATABASE_URL: postgresql://quacker:quacker@localhost:5433/quacker_test
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm backend prisma:generate
+
+      # Jest transpiles the ES-module dependencies; caching that saves most of a minute.
+      - name: Cache Jest transforms
+        uses: actions/cache@v4
+        with:
+          path: apps/backend/node_modules/.cache/jest-int
+          key: jest-int-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Integration tests
+        run: pnpm backend test:int
+
+  # The whole app in a browser: database, backend and frontend started here.
+  test-e2e:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: quacker
+          POSTGRES_PASSWORD: quacker
+          POSTGRES_DB: quacker
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U quacker -d quacker"
+          --health-interval 3s --health-timeout 3s --health-retries 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # The .env.example files point at this job's database and ports.
+      - name: Create env files
+        run: pnpm env:check
+
+      - name: Migrate and seed the database
+        run: |
+          pnpm backend migrate
+          pnpm backend seed
+
+      - name: Install Playwright browser
+        run: pnpm --filter frontend exec playwright install --with-deps chromium
+
+      # Playwright starts the backend and the frontend (webServer in playwright.config.ts).
+      - name: End-to-end tests
+        run: pnpm frontend e2e
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: apps/frontend/playwright-report
+          retention-days: 7
+
+  # Red when a pull request removes or rewrites lines in existing tests, so a
+  # reviewer looks at why. Independent of the other jobs and deliberately not a
+  # required check: it shows on the PR but blocks neither the merge nor the deploy.
+  test-changes:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Check that existing tests only gained lines
+        run: bash scripts/check-test-changes.sh "origin/${{ github.base_ref }}"
