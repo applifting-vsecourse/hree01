@@ -40,6 +40,13 @@ export type Quack = {
   replyCount: number;
   user?: QuackAuthor;
   poll: Poll | null;
+  /**
+   * Likes as the viewer sees them (docs/adr/0002), set by every repository
+   * read that returns quacks. Optional so a quack can be built without a
+   * viewer; missing means no likes. Always 0 / false on a placeholder.
+   */
+  likeCount?: number;
+  likedByMe?: boolean;
 };
 
 export const isPlaceholder = (quack: Pick<Quack, 'deletedBy'>): boolean =>

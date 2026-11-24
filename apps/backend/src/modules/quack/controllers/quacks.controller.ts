@@ -25,6 +25,7 @@ import {
 } from '@nestjs/swagger';
 import { CreateQuackDto } from './dto/create-quack.dto';
 import { CreateReplyDto } from './dto/create-reply.dto';
+import { LikeResponseDto } from './dto/like.response.dto';
 import { ListQuacksQueryDto } from './dto/list-quacks.query.dto';
 import { PollResponseDto } from './dto/poll.response.dto';
 import { QuackResponseDto } from './dto/quack.response.dto';
@@ -192,6 +193,34 @@ export class QuacksController {
   ): Promise<PollResponseDto> {
     const poll = await this.quacksService.setVote(user, quackId, null);
     return PollResponseDto.fromDomain(poll);
+  }
+
+  @Put(':quackId/like')
+  @ApiOperation({ summary: 'Like a quack; liking it again changes nothing' })
+  @ApiResponse({ status: 200, type: LikeResponseDto })
+  @ApiResponse({ status: 401, description: 'Not signed in' })
+  @ApiResponse({ status: 404, description: 'Quack not found, or deleted' })
+  async like(
+    @User() user: Identity,
+    @Param('quackId') quackId: string,
+  ): Promise<LikeResponseDto> {
+    const likes = await this.quacksService.likeQuack(user, quackId);
+    return LikeResponseDto.fromDomain(likes);
+  }
+
+  @Delete(':quackId/like')
+  @ApiOperation({
+    summary: 'Take your like back; without one this changes nothing',
+  })
+  @ApiResponse({ status: 200, type: LikeResponseDto })
+  @ApiResponse({ status: 401, description: 'Not signed in' })
+  @ApiResponse({ status: 404, description: 'Quack not found, or deleted' })
+  async unlike(
+    @User() user: Identity,
+    @Param('quackId') quackId: string,
+  ): Promise<LikeResponseDto> {
+    const likes = await this.quacksService.unlikeQuack(user, quackId);
+    return LikeResponseDto.fromDomain(likes);
   }
 
   @Post(':quackId/poll/close')

@@ -64,6 +64,12 @@ export class QuackResponseDto {
   @ApiProperty({ description: 'Number of replies, counted on every read' })
   replyCount!: number;
 
+  @ApiProperty({ description: 'Number of likes, counted on every read' })
+  likeCount!: number;
+
+  @ApiProperty({ description: 'Whether the signed-in user likes this quack' })
+  likedByMe!: boolean;
+
   static fromDomain(quack: FeedQuack): QuackResponseDto {
     if (!quack.user) {
       throw new Error(
@@ -88,6 +94,9 @@ export class QuackResponseDto {
       poll: quack.poll ? PollResponseDto.fromDomain(quack.poll) : null,
       deletedBy: quack.deletedBy,
       replyCount: quack.replyCount,
+      // A placeholder's likes were erased with its content (docs/adr/0002).
+      likeCount: isDeleted ? 0 : (quack.likeCount ?? 0),
+      likedByMe: isDeleted ? false : (quack.likedByMe ?? false),
     };
   }
 }

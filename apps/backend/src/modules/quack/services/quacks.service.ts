@@ -1,3 +1,4 @@
+import { LikeState } from '@/modules/quack/domain/like';
 import {
   EMPTY_POLL_STATS,
   NewPoll,
@@ -44,6 +45,8 @@ export class QuacksService {
           // a deleted quack kept for its replies is no longer theirs to list
           { authorId: user.id, liveOnly: true }
         : {},
+      // likedByMe depends on who is looking (docs/adr/0002)
+      user.id,
     );
     if (terms.length === 0) return this.withPollViews(quacks, user);
 
@@ -147,6 +150,23 @@ export class QuacksService {
         }),
       );
     }
+  }
+
+  /** Likes a live quack as the signed-in user; liking twice is not an error. */
+  async likeQuack(user: Identity, quackId: string): Promise<LikeState> {
+    // Anyone signed in, the author and moderators included, likes as
+    // themselves: the user comes from the session, never from the request.
+    const likes = await this.quackRepository.likeQuack(quackId, user.id);
+    if (!likes) throw new NotFoundException('Quack not found');
+    return likes;
+  }
+
+  /** Takes the signed-in user's like back; without one this is not an error. */
+  async unlikeQuack(user: Identity, quackId: string): Promise<LikeState> {
+    // Only the user's own like: a moderator can't take back anyone else's.
+    const likes = await this.quackRepository.unlikeQuack(quackId, user.id);
+    if (!likes) throw new NotFoundException('Quack not found');
+    return likes;
   }
 
   /** A quack's replies, oldest first. A placeholder's replies too. */
