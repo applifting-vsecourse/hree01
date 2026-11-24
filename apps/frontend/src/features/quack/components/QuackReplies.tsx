@@ -1,4 +1,4 @@
-import { useId, useState } from "react"
+import { useId, useState, type ReactNode } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { Loader2, MessageCircle, RefreshCw } from "lucide-react"
 
@@ -18,6 +18,8 @@ type QuackRepliesProps = {
   currentUserId?: string
   /** A moderator (admin) can also remove everyone else's replies. */
   isModerator?: boolean
+  /** Other actions on the quack (e.g. its like), in the toggle's row. */
+  actions?: ReactNode
 }
 
 const toggleLabel = (count: number): string =>
@@ -30,13 +32,15 @@ export function QuackReplies({
   canReply,
   currentUserId,
   isModerator = false,
+  actions,
 }: QuackRepliesProps) {
   const [isOpen, setIsOpen] = useState(false)
   const panelId = useId()
 
   return (
     <div className="flex flex-col gap-3">
-      <div>
+      <div className="flex items-center gap-2">
+        {actions}
         <Button
           type="button"
           variant="ghost"
@@ -64,7 +68,7 @@ export function QuackReplies({
   )
 }
 
-type RepliesPanelProps = Omit<QuackRepliesProps, "replyCount"> & { id: string }
+type RepliesPanelProps = Omit<QuackRepliesProps, "replyCount" | "actions"> & { id: string }
 
 // Mounted only while expanded, so replies load on demand.
 function RepliesPanel({ id, quackId, canReply, currentUserId, isModerator }: RepliesPanelProps) {

@@ -3,6 +3,7 @@ import { formatDate } from "@/lib/date"
 
 import type { Quack } from "@/features/quack/api/quackSchemas"
 import { DeleteQuackButton } from "@/features/quack/components/DeleteQuackButton"
+import { LikeButton, LikeCount } from "@/features/quack/components/LikeButton"
 import { QuackMood } from "@/features/quack/components/QuackMood"
 import { QuackPoll } from "@/features/quack/components/QuackPoll"
 import { QuackReplies } from "@/features/quack/components/QuackReplies"
@@ -21,6 +22,8 @@ type QuackItemProps = {
   isModerator?: boolean
   /** Off for static previews, which have no replies to load. */
   shouldShowReplies?: boolean
+  /** Off where nobody is signed in to like as: the count shows, no button. */
+  canLike?: boolean
 }
 
 const articleClassName = "flex w-full gap-4 border-b border-border pt-2 pb-4 last:border-b-0"
@@ -31,9 +34,10 @@ export function QuackItem({
   currentUserId,
   isModerator = false,
   shouldShowReplies = true,
+  canLike = true,
 }: QuackItemProps) {
-  // A deleted quack that others replied to: no author, text, mood or poll,
-  // only what happened to it and the replies, which can't be added to.
+  // A deleted quack that others replied to: no author, text, mood, poll or
+  // likes, only what happened to it and the replies, which can't be added to.
   if (quack.deletedBy !== null || quack.user === null) {
     return (
       <article className={articleClassName}>
@@ -70,6 +74,16 @@ export function QuackItem({
     .slice(0, 2)
     .toUpperCase()
 
+  const likeButton = canLike ? (
+    <LikeButton
+      quackId={quack.id}
+      likeCount={quack.likeCount ?? 0}
+      likedByMe={quack.likedByMe ?? false}
+    />
+  ) : (
+    <LikeCount likeCount={quack.likeCount ?? 0} />
+  )
+
   return (
     <article className={articleClassName}>
       <Avatar className="size-12">
@@ -99,17 +113,20 @@ export function QuackItem({
             />
           </div>
         ) : null}
-        {shouldShowReplies ? (
-          <div className="mt-2">
+        <div className="mt-2">
+          {shouldShowReplies ? (
             <QuackReplies
               quackId={quack.id}
               replyCount={quack.replyCount}
               canReply
               currentUserId={currentUserId}
               isModerator={isModerator}
+              actions={likeButton}
             />
-          </div>
-        ) : null}
+          ) : (
+            likeButton
+          )}
+        </div>
       </div>
 
       {deleteAction ? (

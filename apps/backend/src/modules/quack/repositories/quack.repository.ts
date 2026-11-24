@@ -1,5 +1,6 @@
 import { PrismaService } from '@/core/prisma/prisma.service';
 import {
+  Prisma,
   Poll as PrismaPoll,
   PollOption as PrismaPollOption,
   Quack as PrismaQuack,
@@ -26,13 +27,16 @@ export type CreateReplyResult =
   | { status: 'not_found' }
   | { status: 'quack_deleted' };
 
-// Loaded with every quack, so the feed gets its polls and reply counts in the
-// same query. The count is computed on every read, never stored.
-const quackInclude = {
-  user: true,
-  poll: { include: { options: { orderBy: { position: 'asc' } } } },
-  _count: { select: { replies: true } },
-} as const;
+// Loaded with every quack, so the feed gets its polls, reply and like counts
+// and the viewer's own like in the same query. Counts are computed on every
+// read, never stored (docs/adr/0002).
+const quackInclude = (viewerId: string) =>
+  ({
+    user: true,
+    poll: { include: { options: { orderBy: { position: 'asc' } } } },
+    _count: { select: { replies: true, likes: true } },
+    likes: { where: { userId: viewerId }, select: { userId: true } },
+  }) as const;
 
 const mapPrismaUserToAuthor = (user: PrismaUser): QuackAuthor => ({
   id: user.id,
@@ -68,7 +72,8 @@ const mapPrismaQuackToDomain = (
   quack: PrismaQuack & {
     user?: PrismaUser;
     poll?: (PrismaPoll & { options: PrismaPollOption[] }) | null;
-    _count?: { replies: number };
+    _count?: { replies: number; likes: number };
+    likes?: { userId: string }[];
   },
 ): Quack => ({
   id: quack.id,
@@ -81,6 +86,8 @@ const mapPrismaQuackToDomain = (
   replyCount: quack._count?.replies ?? 0,
   user: quack.user ? mapPrismaUserToAuthor(quack.user) : undefined,
   poll: quack.poll ? mapPrismaPollToDomain(quack.poll) : null,
+  likeCount: quack._count?.likes ?? 0,
+  likedByMe: (quack.likes?.length ?? 0) > 0,
 });
 
 /**
@@ -93,17 +100,19 @@ export class QuackRepository {
 
   /**
    * The feed, newest first. Placeholders (deleted quacks kept for their
-   * replies) are included unless `liveOnly` is set.
+   * replies) are included unless `liveOnly` is set. `viewerId` is whoever is
+   * looking: each quack says whether they like it.
    */
   async getQuacks(
-    filter: { authorId?: string; liveOnly?: boolean } = {},
+    filter: { authorId?: string; liveOnly?: boolean },
+    viewerId: string,
   ): Promise<Quack[]> {
     const quacks = await this.prisma.quack.findMany({
       where: {
         userId: filter.authorId,
         deletedAt: filter.liveOnly ? null : undefined,
       },
-      include: quackInclude,
+      include: quackInclude(viewerId),
       orderBy: { createdAt: 'desc' },
     });
     return quacks.map(mapPrismaQuackToDomain);
@@ -261,7 +270,10 @@ export class QuackRepository {
         return 'deleted';
       }
 
+      // Likes go with the content (docs/adr/0002); the row lock above keeps a
+      // like from landing between this and the update.
       await tx.poll.deleteMany({ where: { quackId } });
+      await tx.like.deleteMany({ where: { quackId } });
       await tx.quack.update({
         where: { id: quackId },
         data: { text: null, mood: null, deletedAt: new Date(), deletedBy },
@@ -275,7 +287,11 @@ export class QuackRepository {
    * its likes as the user now sees them, or null when there is no live quack.
    */
   async likeQuack(quackId: string, userId: string): Promise<LikeState | null> {
-    throw new Error(`Not implemented: like quack ${quackId} as ${userId}`);
+    return this.writeLike(quackId, userId, (tx) =>
+      // ON CONFLICT DO NOTHING: the primary key makes a repeat (or a racing
+      // duplicate) a no-op instead of an error or a second like.
+      tx.like.createMany({ data: { quackId, userId }, skipDuplicates: true }),
+    );
   }
 
   /**
@@ -286,7 +302,33 @@ export class QuackRepository {
     quackId: string,
     userId: string,
   ): Promise<LikeState | null> {
-    throw new Error(`Not implemented: unlike quack ${quackId} as ${userId}`);
+    return this.writeLike(quackId, userId, (tx) =>
+      tx.like.deleteMany({ where: { quackId, userId } }),
+    );
+  }
+
+  /**
+   * Runs a like write on a live quack and reads back its likes. The quack's
+   * row is share-locked: likes don't wait for each other, but deleting the
+   * quack (which locks it for update) can't erase its likes in between.
+   */
+  private async writeLike(
+    quackId: string,
+    userId: string,
+    write: (tx: Prisma.TransactionClient) => Promise<unknown>,
+  ): Promise<LikeState | null> {
+    return this.prisma.$transaction(async (tx) => {
+      const [quack] = await tx.$queryRaw<{ id: string }[]>`
+        SELECT "id" FROM "quack"
+        WHERE "id" = ${quackId} AND "deletedAt" IS NULL
+        FOR SHARE`;
+      if (!quack) return null;
+
+      await write(tx);
+      const likeCount = await tx.like.count({ where: { quackId } });
+      const mine = await tx.like.count({ where: { quackId, userId } });
+      return { likeCount, likedByMe: mine > 0 };
+    });
   }
 
   /** The quack's replies, oldest first, or null when there is no such quack. */
@@ -392,7 +434,7 @@ export class QuackRepository {
             }
           : undefined,
       },
-      include: quackInclude,
+      include: quackInclude(createQuackData.userId),
     });
     return mapPrismaQuackToDomain(quack);
   }

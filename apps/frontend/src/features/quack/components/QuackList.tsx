@@ -95,6 +95,8 @@ export function QuackList({
           quack={quack}
           currentUserId={currentUserId}
           isModerator={isModerator}
+          // liking needs someone signed in to like as
+          canLike={currentUserId !== undefined}
           deleteAction={
             currentUserId !== undefined && quack.userId === currentUserId
               ? "own"

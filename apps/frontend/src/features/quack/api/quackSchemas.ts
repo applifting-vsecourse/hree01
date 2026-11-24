@@ -45,7 +45,8 @@ export const quackSchema = z.object({
   poll: pollSchema.nullable(),
   deletedBy: z.enum(quackDeletedBy).nullable(),
   replyCount: z.number().int(),
-  // Likes (docs/adr/0002). Optional until the API sends them.
+  // Likes (docs/adr/0002). The API always sends them; optional so a quack can
+  // be built without them (e.g. in tests), where missing means no likes.
   likeCount: z.number().int().optional(),
   likedByMe: z.boolean().optional(),
 })

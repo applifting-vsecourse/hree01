@@ -1,6 +1,10 @@
-import type { LikeState } from "@/features/quack/api/quackSchemas"
+import { api } from "@/lib/api-client"
+
+import { likeStateSchema, type LikeState } from "@/features/quack/api/quackSchemas"
 
 /** Likes the quack, or with `isLiked: false` takes the like back. */
-export function setLike(quackId: string, isLiked: boolean): Promise<LikeState> {
-  return Promise.reject(new Error(`Not implemented: set like on quack ${quackId} to ${isLiked}`))
+export async function setLike(quackId: string, isLiked: boolean): Promise<LikeState> {
+  const url = `quacks/${encodeURIComponent(quackId)}/like`
+  const json = isLiked ? await api.put(url).json() : await api.delete(url).json()
+  return likeStateSchema.parse(json)
 }
