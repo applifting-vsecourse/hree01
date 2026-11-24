@@ -19,7 +19,7 @@ const matches = (query: string, quack = aQuack()): boolean =>
   matchesSearchTerms(quack, parseSearchTerms(query));
 
 describe('parseSearchTerms', () => {
-  it('returns no terms for a blank query', () => {
+  it('finds no search terms in a blank query', () => {
     expect(parseSearchTerms('   ')).toEqual([]);
   });
 
