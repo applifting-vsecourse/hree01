@@ -137,7 +137,7 @@ Out of scope: a list of who liked a quack, liking replies, sorting or filtering 
 
 ## API behaviour (integration tests)
 
-Proposed endpoints (final shape is set in the ADR):
+Endpoints ([ADR 0002](docs/adr/0002-likes.md)):
 `PUT /api/quacks/:id/like` likes, `DELETE /api/quacks/:id/like` takes the like back. Both return the quack's `likeCount` and `likedByMe`. Every quack in `GET /api/quacks` carries `likeCount` and `likedByMe`.
 
 **A1. Signed-out visitors can't like**
