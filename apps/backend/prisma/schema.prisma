@@ -53,6 +53,7 @@ model Quack {
   deletedBy QuackDeletedBy?
   poll      Poll?
   replies   Reply[]
+  likes     Like[]
 
   @@index([userId])
   @@map("quack")
@@ -71,6 +72,20 @@ model Reply {
   @@index([quackId, createdAt]) // a quack's replies in order, and their count
   @@index([userId])
   @@map("reply")
+}
+
+// One row per person per liked quack (docs/adr/0002). The primary key is the
+// pair, so the database enforces "only once". Counts are computed on read.
+model Like {
+  quack     Quack    @relation(fields: [quackId], references: [id], onDelete: Cascade)
+  quackId   String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  createdAt DateTime @default(now())
+
+  @@id([quackId, userId])
+  @@index([userId])
+  @@map("like")
 }
 
 enum PollResultsVisibility {
@@ -182,6 +197,7 @@ model User {
   quacks        Quack[]
   replies       Reply[]
   pollVotes     PollVote[]
+  likes         Like[]
   role          UserRole   @default(user)
 
   // BetterAuth's username plugin stores `username` lowercased (so uniqueness is

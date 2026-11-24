@@ -39,7 +39,7 @@ let userCounter = 0;
 export async function signedInAgent(
   app: INestApplication,
   overrides: Partial<TestUser> = {},
-): Promise<{ agent: request.Agent; user: TestUser }> {
+): Promise<{ agent: request.Agent; user: TestUser & { id: string } }> {
   userCounter += 1;
   const user: TestUser = {
     email: `user${userCounter}@example.com`,
@@ -52,5 +52,17 @@ export async function signedInAgent(
   // trusted origins, so send the frontend's origin like a browser would.
   agent.set('Origin', app.get(Config).frontendUrl);
   await agent.post('/api/auth/sign-up/email').send(user).expect(200);
-  return { agent, user };
+  const { id } = await app
+    .get(PrismaService)
+    .user.findUniqueOrThrow({ where: { email: user.email } });
+  return { agent, user: { ...user, id } };
+}
+
+/** Posts a quack through the API as the agent's user and returns its id. */
+export async function postQuack(
+  agent: request.Agent,
+  body: { text: string; poll?: { options: string[] } },
+): Promise<string> {
+  const response = await agent.post('/api/quacks').send(body).expect(201);
+  return (response.body as { id: string }).id;
 }

@@ -129,11 +129,12 @@ describe('QuacksService', () => {
     await expect(
       service.searchQuacks(user, 'cafe', { mine: true }),
     ).resolves.toEqual([mine]);
-    // the author is the session's user, and their placeholders aren't theirs
-    expect(repository.getQuacks).toHaveBeenCalledWith({
-      authorId: 'u1',
-      liveOnly: true,
-    });
+    // the author is the session's user, and their placeholders aren't theirs;
+    // the viewer is passed too, so each quack carries their like (ADR 0002)
+    expect(repository.getQuacks).toHaveBeenCalledWith(
+      { authorId: 'u1', liveOnly: true },
+      'u1',
+    );
   });
 
   it('does not filter by author unless asked for "mine"', async () => {
@@ -142,7 +143,7 @@ describe('QuacksService', () => {
 
     await new QuacksService(repository).searchQuacks(user, '');
 
-    expect(repository.getQuacks).toHaveBeenCalledWith({});
+    expect(repository.getQuacks).toHaveBeenCalledWith({}, 'u1');
   });
 
   it('creates a quack owned by the signed-in user', async () => {

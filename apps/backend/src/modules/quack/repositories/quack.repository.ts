@@ -6,6 +6,7 @@ import {
   Reply as PrismaReply,
   User as PrismaUser,
 } from '@/generated/prisma/client';
+import { LikeState } from '@/modules/quack/domain/like';
 import { NewPoll, Poll, PollStats } from '@/modules/quack/domain/poll';
 import {
   Quack,
@@ -267,6 +268,25 @@ export class QuackRepository {
       });
       return 'placeholder';
     });
+  }
+
+  /**
+   * Likes a live quack as the user; liking it again changes nothing. Returns
+   * its likes as the user now sees them, or null when there is no live quack.
+   */
+  async likeQuack(quackId: string, userId: string): Promise<LikeState | null> {
+    throw new Error(`Not implemented: like quack ${quackId} as ${userId}`);
+  }
+
+  /**
+   * Takes the user's like back; without one this changes nothing. Returns the
+   * quack's likes as the user now sees them, or null when there is no live quack.
+   */
+  async unlikeQuack(
+    quackId: string,
+    userId: string,
+  ): Promise<LikeState | null> {
+    throw new Error(`Not implemented: unlike quack ${quackId} as ${userId}`);
   }
 
   /** The quack's replies, oldest first, or null when there is no such quack. */

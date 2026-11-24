@@ -1,3 +1,4 @@
+import { LikeState } from '@/modules/quack/domain/like';
 import {
   EMPTY_POLL_STATS,
   NewPoll,
@@ -147,6 +148,16 @@ export class QuacksService {
         }),
       );
     }
+  }
+
+  /** Likes a live quack as the signed-in user; liking twice is not an error. */
+  async likeQuack(user: Identity, quackId: string): Promise<LikeState> {
+    throw new Error(`Not implemented: like quack ${quackId} as ${user.id}`);
+  }
+
+  /** Takes the signed-in user's like back; without one this is not an error. */
+  async unlikeQuack(user: Identity, quackId: string): Promise<LikeState> {
+    throw new Error(`Not implemented: unlike quack ${quackId} as ${user.id}`);
   }
 
   /** A quack's replies, oldest first. A placeholder's replies too. */

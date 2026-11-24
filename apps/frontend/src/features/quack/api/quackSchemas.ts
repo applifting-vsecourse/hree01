@@ -45,9 +45,18 @@ export const quackSchema = z.object({
   poll: pollSchema.nullable(),
   deletedBy: z.enum(quackDeletedBy).nullable(),
   replyCount: z.number().int(),
+  // Likes (docs/adr/0002). Optional until the API sends them.
+  likeCount: z.number().int().optional(),
+  likedByMe: z.boolean().optional(),
 })
 
 export const quacksSchema = z.array(quackSchema)
+
+// A quack's likes as the signed-in viewer sees them, after liking or unliking.
+export const likeStateSchema = z.object({
+  likeCount: z.number().int(),
+  likedByMe: z.boolean(),
+})
 
 export const replySchema = z.object({
   id: z.string(),
@@ -64,3 +73,4 @@ export type QuackMood = Mood
 export type Poll = z.infer<typeof pollSchema>
 export type Quack = z.infer<typeof quackSchema>
 export type Reply = z.infer<typeof replySchema>
+export type LikeState = z.infer<typeof likeStateSchema>
