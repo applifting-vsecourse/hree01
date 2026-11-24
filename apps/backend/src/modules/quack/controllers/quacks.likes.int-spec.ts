@@ -38,10 +38,7 @@ describe('Likes API', () => {
   });
 
   /** The feed as the agent's user sees it. */
-  const feed = async (
-    agent: request.Agent,
-    query = '',
-  ): Promise<FeedQuack[]> =>
+  const feed = async (agent: request.Agent, query = ''): Promise<FeedQuack[]> =>
     (await agent.get(`/api/quacks${query}`).expect(200)).body as FeedQuack[];
 
   const inFeed = async (
@@ -112,9 +109,7 @@ describe('Likes API', () => {
     const quackId = await postQuack(author, { text: 'Bread is good' });
     await givenLikes(quackId, user.id);
 
-    const response = await me
-      .delete(`/api/quacks/${quackId}/like`)
-      .expect(200);
+    const response = await me.delete(`/api/quacks/${quackId}/like`).expect(200);
 
     expect(response.body).toEqual({ likeCount: 0, likedByMe: false });
     expect(await storedLikes(quackId)).toBe(0);
@@ -126,9 +121,7 @@ describe('Likes API', () => {
     const { agent: me } = await signedInAgent(app);
     const quackId = await postQuack(author, { text: 'Bread is good' });
 
-    const response = await me
-      .delete(`/api/quacks/${quackId}/like`)
-      .expect(200);
+    const response = await me.delete(`/api/quacks/${quackId}/like`).expect(200);
 
     expect(response.body).toEqual({ likeCount: 0, likedByMe: false });
   });

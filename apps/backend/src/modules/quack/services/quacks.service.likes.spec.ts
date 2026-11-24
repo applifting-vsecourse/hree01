@@ -80,9 +80,7 @@ describe('QuacksService likes', () => {
     await expect(service.likeQuack(alice, 'q1')).resolves.toEqual(
       likes(1, true),
     );
-    await expect(service.likeQuack(bob, 'q1')).resolves.toEqual(
-      likes(2, true),
-    );
+    await expect(service.likeQuack(bob, 'q1')).resolves.toEqual(likes(2, true));
     expect(repository.likeQuack).toHaveBeenNthCalledWith(1, 'q1', 'alice');
     expect(repository.likeQuack).toHaveBeenNthCalledWith(2, 'q1', 'bob');
   });
@@ -99,7 +97,7 @@ describe('QuacksService likes', () => {
   });
 
   // R7
-  it("lets the author like their own quack, without checking who wrote it", async () => {
+  it('lets the author like their own quack, without checking who wrote it', async () => {
     repository.getQuackAuthorId.mockResolvedValue('u1');
     repository.likeQuack.mockResolvedValue(likes(1, true));
 
